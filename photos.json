@@ -63,11 +63,27 @@
       "id": 41,
       "title": "ggg",
       "cover_photo": null,
-      "photo_count": 0,
-      "photos": [],
+      "photo_count": 3,
+      "photos": [
+        {
+          "file_id": "AgACAgIAAyEGAATgcPPYAAMgaYO4LtCWVHwh0O1nzWze9I3KnZUAApoLaxsGliFI0Yfb5NMWKq8BAAMCAAN3AAM4BA",
+          "message_id": 42,
+          "uploaded_at": "2026-02-04T21:25:11.731Z"
+        },
+        {
+          "file_id": "AgACAgIAAyEGAATgcPPYAAMhaYO4MOBocvH37x_rEX-sCCfJe1QAApsLaxsGliFInexiqOj8SVABAAMCAAN3AAM4BA",
+          "message_id": 43,
+          "uploaded_at": "2026-02-04T21:25:14.008Z"
+        },
+        {
+          "file_id": "AgACAgIAAyEGAATgcPPYAAMiaYO4MpvNJQu9aPyHyOjmyT1q-xMAApwLaxsGliFIi2AdIQUqgn0BAAMCAAN3AAM4BA",
+          "message_id": 44,
+          "uploaded_at": "2026-02-04T21:25:15.998Z"
+        }
+      ],
       "created_at": "2026-02-04"
     }
   ],
-  "last_updated": "2026-02-04T21:24:55.021Z",
+  "last_updated": "2026-02-04T21:25:17.358Z",
   "version": "1.0"
 }
