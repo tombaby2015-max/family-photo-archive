@@ -378,7 +378,6 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
     <script>
         // Конфигурация
         const CONFIG = {
-            GITHUB_JSON_URL: 'https://raw.githubusercontent.com/tombaby2015-max/family-photo-archive/main/photos.json',
             WORKER_URL: 'https://family-photos-worker.belovolov-email.workers.dev',
             ADMIN_PASSWORD: 'dima1105',
             DEFAULT_COVER: 'https://cdn4.iconfinder.com/data/icons/interface-52/100/folder-512.png'
@@ -467,85 +466,74 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
             showNotification('Вы вышли из админки', 'success');
         }
         
-        // Загрузка альбомов
-        async function loadAlbums() {
-    showLoader();
-    
-    try {
-        // Загружаем альбомы через Worker
-        const response = await fetch(`${CONFIG.WORKER_URL}/api/get-photos-json`);
-        
-        if (!response.ok) {
-            throw new Error('Не удалось загрузить альбомы');
+        // Загрузка альбомов (локальное хранилище)
+        function loadAlbums() {
+            showLoader();
+            
+            try {
+                // Загружаем из localStorage
+                const saved = localStorage.getItem('familyPhotoAlbums');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    albums = data.albums || [];
+                } else {
+                    albums = [];
+                }
+                
+                renderAlbums();
+            } catch (error) {
+                console.error('Ошибка:', error);
+                albums = [];
+                renderAlbums();
+            } finally {
+                hideLoader();
+            }
         }
         
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            // Преобразуем topics в albums для совместимости
-            albums = data.data.topics ? data.data.topics.map(topic => ({
-                id: topic.topic_id,
-                title: topic.title,
-                cover_photo: topic.cover_photo,
-                photo_count: topic.photos ? topic.photos.length : 0,
-                created_at: topic.created_at,
-                last_updated: data.data.updated_at
-            })) : [];
-        } else {
-            albums = [];
+        // Сохранение альбомов в localStorage
+        function saveAlbums() {
+            const data = {
+                albums: albums,
+                last_updated: new Date().toISOString(),
+                version: '1.0'
+            };
+            localStorage.setItem('familyPhotoAlbums', JSON.stringify(data));
         }
-        
-        renderAlbums();
-    } catch (error) {
-        console.error('Ошибка загрузки альбомов:', error);
-        albums = [];
-        renderAlbums();
-        showNotification('Используем локальные данные', 'info');
-    } finally {
-        hideLoader();
-    }
-}
         
         // Отображение альбомов
         function renderAlbums() {
             const container = document.getElementById('dynamicAlbums');
             let html = '';
-            let rowCount = 0;
             
             // Группируем по 3 в строку (как в вашем дизайне)
-            albums.forEach((album, index) => {
-                if (index % 3 === 0) {
-                    if (index > 0) html += '</ul></div>';
-                    html += `
-                        <div class="r t-rec t-rec_pt_30" style="padding-top:30px;" data-record-type="147">
-                            <div class="t214">
-                                <ul class="t214__container t-card__container t-container t-container_flex">
-                    `;
-                    rowCount = 0;
-                }
-                
-                const coverUrl = album.cover_photo ? 
-                    `${CONFIG.WORKER_URL}/api/get-photo?file_id=${album.cover_photo}` : 
-                    CONFIG.DEFAULT_COVER;
-                
+            for (let i = 0; i < albums.length; i += 3) {
                 html += `
-                    <li class="t214__col t-item t-card__col t-col t-col_4" itemscope itemtype="http://schema.org/ImageObject">
-                        <div class="t214__blockimg t-bgimg" 
-                             data-original="${coverUrl}" 
-                             style="background: url('${coverUrl}') center center no-repeat; background-size:cover; cursor: pointer;"
-                             onclick="openAlbum(${album.id})">
-                        </div>
-                        <div class="folder-label">${album.title}</div>
-                        <div class="folder-count">${album.photo_count || 0} фото</div>
-                    </li>
+                    <div class="r t-rec t-rec_pt_30" style="padding-top:30px;" data-record-type="147">
+                        <div class="t214">
+                            <ul class="t214__container t-card__container t-container t-container_flex">
                 `;
                 
-                rowCount++;
-                
-                // Если строка заполнена или это последний альбом
-                if (rowCount === 3 || index === albums.length - 1) {
-                    // Добавляем кнопку "+" если в админке и строка не полная
-                    if (isAdmin && rowCount < 3 && index === albums.length - 1) {
+                // Три альбома в строке
+                for (let j = 0; j < 3; j++) {
+                    const album = albums[i + j];
+                    
+                    if (album) {
+                        const coverUrl = album.cover_photo ? 
+                            `${CONFIG.WORKER_URL}/api/get-photo?file_id=${album.cover_photo}` : 
+                            CONFIG.DEFAULT_COVER;
+                        
+                        html += `
+                            <li class="t214__col t-item t-card__col t-col t-col_4" itemscope itemtype="http://schema.org/ImageObject">
+                                <div class="t214__blockimg t-bgimg" 
+                                     style="background: url('${coverUrl}') center center no-repeat; background-size:cover; cursor: pointer;"
+                                     onclick="openAlbum(${album.id})">
+                                </div>
+                                <div class="folder-label">${album.title}</div>
+                                <div class="folder-count">${album.photo_count || 0} фото</div>
+                            </li>
+                        `;
+                    } else if (isAdmin && j === 0 && i === albums.length) {
+                        // Кнопка "+" если в админке и это последняя строка
                         html += `
                             <li class="t214__col t-item t-card__col t-col t-col_4 add-folder" onclick="showCreateFolderModal()">
                                 <div class="t214__blockimg t-bgimg" style="background: #f9f9f9; display: flex; align-items: center; justify-content: center;">
@@ -554,11 +542,14 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
                                 <div class="folder-label">Добавить папку</div>
                             </li>
                         `;
+                    } else {
+                        // Пустая ячейка
+                        html += '<li class="t214__col t-item t-card__col t-col t-col_4"></li>';
                     }
-                    
-                    html += '</ul></div></div>';
                 }
-            });
+                
+                html += '</ul></div></div>';
+            }
             
             // Если нет альбомов
             if (albums.length === 0) {
@@ -585,7 +576,7 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
                         </div>
                     `;
                 }
-            } else if (isAdmin && albums.length % 3 !== 0) {
+            } else if (isAdmin && albums.length % 3 === 0) {
                 // Если есть альбомы и мы в админке, добавляем кнопку "+" в новую строку
                 html += `
                     <div class="r t-rec t-rec_pt_30" style="padding-top:30px;" data-record-type="147">
@@ -604,13 +595,6 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
             }
             
             container.innerHTML = html;
-            
-            // Инициализируем lazy load (если нужно)
-            if (typeof t214__updateLazyLoad === 'function') {
-                setTimeout(() => {
-                    t214__updateLazyLoad();
-                }, 100);
-            }
         }
         
         // Создание папки
@@ -624,79 +608,57 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
             document.getElementById('folderNameInput').value = '';
         }
         
-        // Временная функция для создания папки (без GitHub)
-async function createFolder() {
-    const folderName = document.getElementById('folderNameInput').value.trim();
-    
-    if (!folderName) {
-        showNotification('Введите название папки', 'error');
-        return;
-    }
-    
-    showLoader();
-    
-    try {
-        // Создаём тему в Telegram
-        const response = await fetch(`${CONFIG.WORKER_URL}/api/create-topic`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: folderName })
-        });
-        
-        if (!response.ok) throw new Error('Ошибка создания темы');
-        
-        const data = await response.json();
-        
-        if (data.status !== 'success') {
-            throw new Error(data.message || 'Ошибка создания темы');
-        }
-        
-        // Добавляем в локальный массив (временное решение)
-        const newAlbum = {
-            id: data.topic_id,
-            title: folderName,
-            cover_photo: null,
-            photo_count: 0,
-            created_at: new Date().toISOString().split('T')[0]
-        };
-        
-        albums.push(newAlbum);
-        
-        // Обновляем отображение
-        renderAlbums();
-        
-        // Закрываем модальное окно
-        closeCreateFolderModal();
-        
-        // Показываем уведомление
-        showNotification(`Папка "${folderName}" создана! ID: ${data.topic_id}`, 'success');
-        
-    } catch (error) {
-        console.error('Ошибка:', error);
-        showNotification(`Ошибка: ${error.message}`, 'error');
-    } finally {
-        hideLoader();
-    }
-}
-
-// И временная функция загрузки (пустой массив)
-async function loadAlbums() {
-    showLoader();
-    
-    try {
-        // Временно используем пустой массив
-        albums = [];
-        renderAlbums();
-    } catch (error) {
-        console.error('Ошибка:', error);
-        albums = [];
-        renderAlbums();
-    } finally {
-        hideLoader();
-    }
-}
+        async function createFolder() {
+            const folderName = document.getElementById('folderNameInput').value.trim();
+            
+            if (!folderName) {
+                showNotification('Введите название папки', 'error');
+                return;
+            }
+            
+            showLoader();
+            
+            try {
+                // Создаём тему в Telegram через Worker
+                const response = await fetch(`${CONFIG.WORKER_URL}/api/create-topic`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: folderName })
+                });
                 
-                // TODO: Обновить photos.json на GitHub
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.status !== 'success') {
+                    throw new Error(data.message || 'Ошибка создания темы');
+                }
+                
+                // Добавляем в локальный массив
+                const newAlbum = {
+                    id: data.topic_id,
+                    title: folderName,
+                    cover_photo: null,
+                    photo_count: 0,
+                    created_at: new Date().toISOString().split('T')[0]
+                };
+                
+                albums.push(newAlbum);
+                
+                // Сохраняем в localStorage
+                saveAlbums();
+                
+                // Обновляем отображение
+                renderAlbums();
+                
+                // Закрываем модальное окно
+                closeCreateFolderModal();
+                
+                // Показываем уведомление
+                showNotification(`Папка "${folderName}" создана!`, 'success');
                 
             } catch (error) {
                 console.error('Ошибка:', error);
