@@ -469,24 +469,42 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
         
         // Загрузка альбомов
         async function loadAlbums() {
-            showLoader();
-            
-            try {
-                const response = await fetch(CONFIG.GITHUB_JSON_URL);
-                if (!response.ok) throw new Error('Не удалось загрузить альбомы');
-                
-                const data = await response.json();
-                albums = data.albums || [];
-                
-                renderAlbums();
-            } catch (error) {
-                console.error('Ошибка:', error);
-                albums = [];
-                renderAlbums();
-            } finally {
-                hideLoader();
-            }
+    showLoader();
+    
+    try {
+        // Загружаем альбомы через Worker
+        const response = await fetch(`${CONFIG.WORKER_URL}/api/get-photos-json`);
+        
+        if (!response.ok) {
+            throw new Error('Не удалось загрузить альбомы');
         }
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            // Преобразуем topics в albums для совместимости
+            albums = data.data.topics ? data.data.topics.map(topic => ({
+                id: topic.topic_id,
+                title: topic.title,
+                cover_photo: topic.cover_photo,
+                photo_count: topic.photos ? topic.photos.length : 0,
+                created_at: topic.created_at,
+                last_updated: data.data.updated_at
+            })) : [];
+        } else {
+            albums = [];
+        }
+        
+        renderAlbums();
+    } catch (error) {
+        console.error('Ошибка загрузки альбомов:', error);
+        albums = [];
+        renderAlbums();
+        showNotification('Используем локальные данные', 'info');
+    } finally {
+        hideLoader();
+    }
+}
         
         // Отображение альбомов
         function renderAlbums() {
