@@ -505,6 +505,86 @@
         function hideLoader() {
             document.getElementById('loader').style.display = 'none';
         }
+    
+    // Показываем кнопку загрузки для админа
+if (isAdmin) {
+    document.getElementById('uploadBtn').style.display = 'inline-block';
+    document.getElementById('uploadBtn').addEventListener('click', openUploadModal);
+}
+
+// Загрузка фото
+function openUploadModal() {
+    document.getElementById('uploadModal').style.display = 'flex';
+}
+
+function closeUploadModal() {
+    document.getElementById('uploadModal').style.display = 'none';
+    document.getElementById('photoUpload').value = '';
+    document.getElementById('uploadProgress').style.display = 'none';
+}
+
+async function uploadPhotos() {
+    const files = document.getElementById('photoUpload').files;
+    
+    if (files.length === 0) {
+        alert('Выберите файлы для загрузки');
+        return;
+    }
+    
+    document.getElementById('uploadProgress').style.display = 'block';
+    document.getElementById('uploadStatus').textContent = `Загрузка 0 из ${files.length}`;
+    
+    let uploadedCount = 0;
+    
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        const formData = new FormData();
+        formData.append('topic_id', albumId);
+        formData.append('photo', file);
+        
+        try {
+            const response = await fetch(`${CONFIG.WORKER_URL}/api/upload-photo`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                uploadedCount++;
+                const progress = (uploadedCount / files.length) * 100;
+                document.getElementById('uploadProgressBar').style.width = progress + '%';
+                document.getElementById('uploadStatus').textContent = `Загружено ${uploadedCount} из ${files.length}`;
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки:', error);
+        }
+    }
+    
+    setTimeout(() => {
+        closeUploadModal();
+        alert(`Загружено ${uploadedCount} из ${files.length} фото`);
+        // Обновляем список фото
+        loadPhotos();
+    }, 1000);
+}
     </script>
+<!-- Модальное окно загрузки фото -->
+<div class="modal-overlay" id="uploadModal">
+    <div class="modal" style="max-width: 400px;">
+        <h3>Загрузить фото в альбом</h3>
+        <input type="file" id="photoUpload" accept="image/*" multiple>
+        <div class="modal-buttons" style="margin-top: 20px;">
+            <button class="modal-btn secondary" onclick="closeUploadModal()">Отмена</button>
+            <button class="modal-btn primary" onclick="uploadPhotos()">Загрузить</button>
+        </div>
+        <div id="uploadProgress" style="margin-top: 15px; display: none;">
+            <div style="background: #f0f0f0; height: 20px; border-radius: 10px; overflow: hidden;">
+                <div id="uploadProgressBar" style="background: #4CAF50; height: 100%; width: 0%; transition: width 0.3s;"></div>
+            </div>
+            <div id="uploadStatus" style="text-align: center; margin-top: 5px; font-size: 12px;"></div>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>
