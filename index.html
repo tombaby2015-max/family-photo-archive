@@ -669,16 +669,13 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
         }
         
         function openAlbum(albumId) {
-            if (isAdmin) {
-                // В админке открываем управление альбомом
-                showNotification(`Открыта папка ID: ${albumId} (режим админки)`, 'success');
-                // TODO: Реализовать страницу управления
-            } else {
-                // В обычном режиме открываем просмотр
-                showNotification(`Открыта папка ID: ${albumId} (режим просмотра)`, 'success');
-                // TODO: Реализовать галерею
-            }
-        }
+    // Находим альбом
+    const album = albums.find(a => a.id === albumId);
+    if (!album) return;
+    
+    // Переходим на страницу галереи
+    window.location.href = `album.html?id=${albumId}&title=${encodeURIComponent(album.title)}`;
+}
     </script>
 </body>
 </html>
