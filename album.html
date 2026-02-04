@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Галерея фото</title>
+    
+    <!-- Стили Tilda (такие же как на главной) -->
+    <link rel="stylesheet" href="https://static.tildacdn.ink/css/tilda-grid-3.0.min.css" type="text/css" media="all" />
+    <link rel="stylesheet" href="https://static.tildacdn.ink/css/tilda-cover-1.0.min.css" type="text/css" media="all" />
+    <link rel="stylesheet" href="https://static.tildacdn.ink/css/tilda-cards-1.0.min.css" type="text/css" media="all" />
+    <link rel="stylesheet" href="https://static.tildacdn.ink/css/fonts-tildasans.css" type="text/css" media="all" />
+    
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .album-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #333;
+            margin: 0;
+        }
+        
+        .back-button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .back-button:hover {
+            background: #45a049;
+        }
+        
+        /* Галерея */
+        .gallery-container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        
+        .photos-count {
+            color: #666;
+            margin: 10px 0 30px 0;
+        }
+        
+        .photos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 50px;
+        }
+        
+        .photo-item {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        
+        .photo-item:hover {
+            transform: translateY(-5px);
+        }
+        
+        .photo-img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+        }
+        
+        /* Модальное окно для просмотра фото */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+        }
+        
+        .modal-img {
+            max-width: 100%;
+            max-height: 80vh;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .modal-nav {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+        
+        .nav-btn {
+            background: rgba(255,255,255,0.8);
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            pointer-events: all;
+            margin: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .nav-btn:hover {
+            background: white;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.8);
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-close:hover {
+            background: white;
+        }
+        
+        .modal-info {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+        }
+        
+        /* Кнопки управления */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .action-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .download-btn {
+            background: #2196F3;
+            color: white;
+        }
+        
+        .delete-btn {
+            background: #f44336;
+            color: white;
+        }
+        
+        /* Загрузчик */
+        .loader {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.8);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .loader-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .photos-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 15px;
+            }
+            
+            .nav-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+                margin: 0 10px;
+            }
+            
+            .album-title {
+                font-size: 1.5rem;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .photos-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+        }
+        
+        /* Сообщение об отсутствии фото */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+            background: white;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <!-- Загрузчик -->
+    <div class="loader" id="loader">
+        <div class="loader-spinner"></div>
+    </div>
+    
+    <!-- Шапка -->
+    <div class="header">
+        <div class="header-content">
+            <h1 class="album-title" id="albumTitle">Загрузка...</h1>
+            <a href="index.html" class="back-button">← Назад к альбомам</a>
+        </div>
+    </div>
+    
+    <!-- Основной контент -->
+    <div class="gallery-container">
+        <div class="photos-count" id="photosCount">Загрузка фото...</div>
+        
+        <div id="photosGrid" class="photos-grid">
+            <!-- Фото будут загружаться сюда -->
+        </div>
+        
+        <!-- Сообщение об отсутствии фото -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-state-icon">📷</div>
+            <div style="font-size: 1.2rem; margin-bottom: 10px;">В этом альбоме пока нет фото</div>
+            <p>Войдите в админку, чтобы добавить фотографии</p>
+        </div>
+    </div>
+    
+    <!-- Модальное окно просмотра фото -->
+    <div class="modal-overlay" id="photoModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <img class="modal-img" id="modalImage" src="" alt="">
+            <div class="modal-nav">
+                <button class="nav-btn" onclick="prevPhoto()">←</button>
+                <button class="nav-btn" onclick="nextPhoto()">→</button>
+            </div>
+            <div class="modal-info">
+                <div id="photoInfo">Фото 1 из 10</div>
+                <div class="action-buttons">
+                    <button class="action-btn download-btn" onclick="downloadPhoto()">Скачать</button>
+                    <button class="action-btn delete-btn" id="deleteBtn" onclick="deletePhoto()" style="display: none;">Удалить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Получаем параметры из URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const albumId = urlParams.get('id');
+        const albumTitle = urlParams.get('title') || 'Альбом';
+        
+        // Конфигурация
+        const CONFIG = {
+            WORKER_URL: 'https://family-photos-worker.belovolov-email.workers.dev',
+            ADMIN_PASSWORD: 'dima1105'
+        };
+        
+        // Глобальные переменные
+        let photos = [];
+        let currentPhotoIndex = 0;
+        let isAdmin = false;
+        
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!albumId) {
+                alert('Альбом не найден');
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            // Устанавливаем заголовок
+            document.getElementById('albumTitle').textContent = decodeURIComponent(albumTitle);
+            
+            // Проверяем, админ ли
+            const savedSession = localStorage.getItem('photoArchiveAdmin');
+            if (savedSession === CONFIG.ADMIN_PASSWORD) {
+                isAdmin = true;
+                document.getElementById('deleteBtn').style.display = 'block';
+            }
+            
+            // Загружаем фото
+            loadPhotos();
+            
+            // Обработчики клавиш
+            document.addEventListener('keydown', handleKeyPress);
+        });
+        
+        // Загрузка фото
+        async function loadPhotos() {
+            showLoader();
+            
+            try {
+                // Пока заглушка - в реальности нужно получать фото из Worker
+                // Сейчас просто показываем сообщение
+                photos = []; // Пока пустой массив
+                
+                if (photos.length === 0) {
+                    document.getElementById('emptyState').style.display = 'block';
+                    document.getElementById('photosCount').textContent = 'В альбоме 0 фото';
+                } else {
+                    renderPhotos();
+                }
+                
+            } catch (error) {
+                console.error('Ошибка загрузки фото:', error);
+                document.getElementById('photosCount').textContent = 'Ошибка загрузки фото';
+            } finally {
+                hideLoader();
+            }
+        }
+        
+        // Отображение фото
+        function renderPhotos() {
+            const grid = document.getElementById('photosGrid');
+            let html = '';
+            
+            photos.forEach((photo, index) => {
+                const photoUrl = `${CONFIG.WORKER_URL}/api/get-photo?file_id=${photo.file_id}`;
+                
+                html += `
+                    <div class="photo-item" onclick="openModal(${index})">
+                        <img src="${photoUrl}" alt="Фото ${index + 1}" class="photo-img" loading="lazy">
+                    </div>
+                `;
+            });
+            
+            grid.innerHTML = html;
+            document.getElementById('photosCount').textContent = `В альбоме ${photos.length} фото`;
+        }
+        
+        // Модальное окно
+        function openModal(index) {
+            if (photos.length === 0) return;
+            
+            currentPhotoIndex = index;
+            updateModal();
+            document.getElementById('photoModal').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeModal() {
+            document.getElementById('photoModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+        
+        function updateModal() {
+            if (photos.length === 0) return;
+            
+            const photo = photos[currentPhotoIndex];
+            const photoUrl = `${CONFIG.WORKER_URL}/api/get-photo?file_id=${photo.file_id}`;
+            
+            document.getElementById('modalImage').src = photoUrl;
+            document.getElementById('photoInfo').textContent = `Фото ${currentPhotoIndex + 1} из ${photos.length}`;
+        }
+        
+        function nextPhoto() {
+            if (photos.length === 0) return;
+            currentPhotoIndex = (currentPhotoIndex + 1) % photos.length;
+            updateModal();
+        }
+        
+        function prevPhoto() {
+            if (photos.length === 0) return;
+            currentPhotoIndex = (currentPhotoIndex - 1 + photos.length) % photos.length;
+            updateModal();
+        }
+        
+        // Обработка клавиш
+        function handleKeyPress(e) {
+            if (document.getElementById('photoModal').style.display === 'flex') {
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        prevPhoto();
+                        break;
+                    case 'ArrowRight':
+                        nextPhoto();
+                        break;
+                    case 'Escape':
+                        closeModal();
+                        break;
+                }
+            }
+        }
+        
+        // Действия с фото
+        function downloadPhoto() {
+            if (photos.length === 0) return;
+            
+            const photo = photos[currentPhotoIndex];
+            const photoUrl = `${CONFIG.WORKER_URL}/api/get-photo?file_id=${photo.file_id}`;
+            
+            // Создаём временную ссылку для скачивания
+            const link = document.createElement('a');
+            link.href = photoUrl;
+            link.download = `photo_${currentPhotoIndex + 1}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        function deletePhoto() {
+            if (!isAdmin || photos.length === 0) return;
+            
+            if (confirm('Вы уверены, что хотите удалить это фото?')) {
+                // TODO: Реализовать удаление фото через Worker
+                alert('Удаление фото будет реализовано в следующем обновлении');
+            }
+        }
+        
+        // Вспомогательные функции
+        function showLoader() {
+            document.getElementById('loader').style.display = 'flex';
+        }
+        
+        function hideLoader() {
+            document.getElementById('loader').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
