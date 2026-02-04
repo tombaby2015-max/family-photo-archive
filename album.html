@@ -281,6 +281,83 @@
             margin-bottom: 20px;
             color: #ddd;
         }
+        
+        /* Стили для модального окна загрузки */
+        .modal {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        
+        .modal h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .modal input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px dashed #ddd;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            min-width: 80px;
+        }
+        
+        .modal-btn.primary {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .modal-btn.secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .upload-progress {
+            margin-top: 15px;
+            display: none;
+        }
+        
+        .progress-bar {
+            background: #f0f0f0;
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .progress-fill {
+            background: #4CAF50;
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .upload-status {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -290,13 +367,15 @@
     </div>
     
     <!-- Шапка -->
-    <div class="header-content">
-    <h1 class="album-title" id="albumTitle">Загрузка...</h1>
-    <div>
-        <a href="index.html" class="back-button">← Назад к альбомам</a>
-        <button class="back-button" id="uploadBtn" style="margin-left: 10px; display: none;">+ Добавить фото</button>
+    <div class="header">
+        <div class="header-content">
+            <h1 class="album-title" id="albumTitle">Загрузка...</h1>
+            <div>
+                <a href="index.html" class="back-button">← Назад к альбомам</a>
+                <button class="back-button" id="uploadBtn" style="margin-left: 10px; display: none;">+ Добавить фото</button>
+            </div>
+        </div>
     </div>
-</div>
     
     <!-- Основной контент -->
     <div class="gallery-container">
@@ -310,7 +389,7 @@
         <div id="emptyState" class="empty-state" style="display: none;">
             <div class="empty-state-icon">📷</div>
             <div style="font-size: 1.2rem; margin-bottom: 10px;">В этом альбоме пока нет фото</div>
-            <p>Войдите в админку, чтобы добавить фотографии</p>
+            <p id="emptyStateText">Войдите в админку, чтобы добавить фотографии</p>
         </div>
     </div>
     
@@ -333,6 +412,26 @@
         </div>
     </div>
     
+    <!-- Модальное окно загрузки фото -->
+    <div class="modal-overlay" id="uploadModal">
+        <div class="modal">
+            <h3>Загрузить фото в альбом</h3>
+            <input type="file" id="photoUpload" accept="image/*" multiple>
+            
+            <div class="upload-progress" id="uploadProgress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="uploadProgressBar"></div>
+                </div>
+                <div class="upload-status" id="uploadStatus"></div>
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="modal-btn secondary" onclick="closeUploadModal()">Отмена</button>
+                <button class="modal-btn primary" onclick="uploadPhotos()">Загрузить</button>
+            </div>
+        </div>
+    </div>
+    
     <script>
         // Получаем параметры из URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -349,6 +448,7 @@
         let photos = [];
         let currentPhotoIndex = 0;
         let isAdmin = false;
+        let albumData = null;
         
         // Инициализация
         document.addEventListener('DOMContentLoaded', function() {
@@ -365,43 +465,83 @@
             const savedSession = localStorage.getItem('photoArchiveAdmin');
             if (savedSession === CONFIG.ADMIN_PASSWORD) {
                 isAdmin = true;
+                document.getElementById('uploadBtn').style.display = 'inline-block';
                 document.getElementById('deleteBtn').style.display = 'block';
             }
             
-            // Загружаем фото
-            loadPhotos();
-            
-            // Обработчики клавиш
+            // Назначаем обработчики
+            document.getElementById('uploadBtn').addEventListener('click', openUploadModal);
             document.addEventListener('keydown', handleKeyPress);
+            
+            // Загружаем фото
+            loadAlbumData();
         });
         
-        // Загрузка фото
-        async function loadPhotos() {
+        // Загрузка данных альбома
+        async function loadAlbumData() {
             showLoader();
             
             try {
-                // Пока заглушка - в реальности нужно получать фото из Worker
-                // Сейчас просто показываем сообщение
-                photos = []; // Пока пустой массив
+                // Загружаем все альбомы
+                const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
+                const data = await response.json();
                 
-                if (photos.length === 0) {
-                    document.getElementById('emptyState').style.display = 'block';
-                    document.getElementById('photosCount').textContent = 'В альбоме 0 фото';
+                if (data.status === 'success') {
+                    // Находим нужный альбом
+                    const allAlbums = data.albums || [];
+                    albumData = allAlbums.find(album => album.id == albumId);
+                    
+                    if (albumData) {
+                        photos = albumData.photos || [];
+                        updatePhotoCount();
+                        renderPhotos();
+                    } else {
+                        showEmptyState('Альбом не найден');
+                    }
                 } else {
-                    renderPhotos();
+                    throw new Error(data.message || 'Ошибка загрузки данных');
                 }
-                
             } catch (error) {
-                console.error('Ошибка загрузки фото:', error);
-                document.getElementById('photosCount').textContent = 'Ошибка загрузки фото';
+                console.error('Ошибка загрузки альбома:', error);
+                showEmptyState('Ошибка загрузки альбома');
             } finally {
                 hideLoader();
             }
         }
         
+        // Обновление счетчика фото
+        function updatePhotoCount() {
+            const count = photos.length;
+            const text = count === 0 ? 'В альбоме нет фото' : `В альбоме ${count} фото`;
+            document.getElementById('photosCount').textContent = text;
+            
+            if (count === 0) {
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('emptyStateText').textContent = isAdmin ? 
+                    'Нажмите "+ Добавить фото", чтобы загрузить фотографии' :
+                    'Войдите в админку, чтобы добавить фотографии';
+            } else {
+                document.getElementById('emptyState').style.display = 'none';
+            }
+        }
+        
+        // Показать состояние пустого альбома
+        function showEmptyState(message) {
+            document.getElementById('emptyState').style.display = 'block';
+            document.getElementById('emptyStateText').textContent = message;
+            document.getElementById('photosGrid').innerHTML = '';
+            document.getElementById('photosCount').textContent = message;
+        }
+        
         // Отображение фото
         function renderPhotos() {
             const grid = document.getElementById('photosGrid');
+            
+            if (photos.length === 0) {
+                grid.innerHTML = '';
+                return;
+            }
+            
             let html = '';
             
             photos.forEach((photo, index) => {
@@ -415,10 +555,9 @@
             });
             
             grid.innerHTML = html;
-            document.getElementById('photosCount').textContent = `В альбоме ${photos.length} фото`;
         }
         
-        // Модальное окно
+        // Модальное окно просмотра
         function openModal(index) {
             if (photos.length === 0) return;
             
@@ -497,6 +636,139 @@
             }
         }
         
+        // Загрузка фото
+        function openUploadModal() {
+            if (!isAdmin) {
+                alert('Войдите в админку для загрузки фото');
+                return;
+            }
+            document.getElementById('uploadModal').style.display = 'flex';
+            document.getElementById('photoUpload').value = '';
+            document.getElementById('uploadProgress').style.display = 'none';
+        }
+        
+        function closeUploadModal() {
+            document.getElementById('uploadModal').style.display = 'none';
+        }
+        
+        async function uploadPhotos() {
+            const files = document.getElementById('photoUpload').files;
+            
+            if (files.length === 0) {
+                alert('Выберите файлы для загрузки');
+                return;
+            }
+            
+            // Показываем прогресс
+            document.getElementById('uploadProgress').style.display = 'block';
+            document.getElementById('uploadStatus').textContent = `Загрузка 0 из ${files.length}`;
+            document.getElementById('uploadProgressBar').style.width = '0%';
+            
+            let uploadedCount = 0;
+            let errors = [];
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                
+                // Проверяем размер файла (максимум 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    errors.push(`${file.name}: слишком большой файл (максимум 10MB)`);
+                    continue;
+                }
+                
+                const formData = new FormData();
+                formData.append('topic_id', albumId);
+                formData.append('photo', file);
+                
+                try {
+                    const response = await fetch(`${CONFIG.WORKER_URL}/api/upload-photo`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        uploadedCount++;
+                        
+                        // Добавляем фото в локальный массив
+                        photos.push({
+                            file_id: data.file_id,
+                            message_id: data.message_id,
+                            uploaded_at: new Date().toISOString()
+                        });
+                        
+                        // Обновляем прогресс
+                        const progress = (uploadedCount / files.length) * 100;
+                        document.getElementById('uploadProgressBar').style.width = progress + '%';
+                        document.getElementById('uploadStatus').textContent = `Загружено ${uploadedCount} из ${files.length}`;
+                    } else {
+                        errors.push(`${file.name}: ${data.message || 'Ошибка загрузки'}`);
+                    }
+                } catch (error) {
+                    errors.push(`${file.name}: ${error.message}`);
+                }
+            }
+            
+            // Обновляем альбом
+            if (uploadedCount > 0) {
+                // Обновляем данные альбома
+                albumData.photos = photos;
+                albumData.photo_count = photos.length;
+                
+                // Сохраняем обновленные данные
+                await saveAlbumData();
+                
+                // Обновляем отображение
+                updatePhotoCount();
+                renderPhotos();
+            }
+            
+            // Закрываем модальное окно
+            setTimeout(() => {
+                closeUploadModal();
+                
+                // Показываем результат
+                let message = `Загружено ${uploadedCount} из ${files.length} фото`;
+                if (errors.length > 0) {
+                    message += '\nОшибки:\n' + errors.join('\n');
+                    alert(message);
+                } else {
+                    alert(message);
+                }
+            }, 500);
+        }
+        
+        // Сохранение данных альбома
+        async function saveAlbumData() {
+            try {
+                // Загружаем все альбомы
+                const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    let allAlbums = data.albums || [];
+                    
+                    // Находим и обновляем нужный альбом
+                    const index = allAlbums.findIndex(album => album.id == albumId);
+                    if (index !== -1) {
+                        allAlbums[index] = albumData;
+                        
+                        // Отправляем обновленные данные на сервер
+                        await fetch(`${CONFIG.WORKER_URL}/api/save-albums`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ albums: allAlbums })
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка сохранения альбома:', error);
+            }
+        }
+        
         // Вспомогательные функции
         function showLoader() {
             document.getElementById('loader').style.display = 'flex';
@@ -505,86 +777,6 @@
         function hideLoader() {
             document.getElementById('loader').style.display = 'none';
         }
-    
-    // Показываем кнопку загрузки для админа
-if (isAdmin) {
-    document.getElementById('uploadBtn').style.display = 'inline-block';
-    document.getElementById('uploadBtn').addEventListener('click', openUploadModal);
-}
-
-// Загрузка фото
-function openUploadModal() {
-    document.getElementById('uploadModal').style.display = 'flex';
-}
-
-function closeUploadModal() {
-    document.getElementById('uploadModal').style.display = 'none';
-    document.getElementById('photoUpload').value = '';
-    document.getElementById('uploadProgress').style.display = 'none';
-}
-
-async function uploadPhotos() {
-    const files = document.getElementById('photoUpload').files;
-    
-    if (files.length === 0) {
-        alert('Выберите файлы для загрузки');
-        return;
-    }
-    
-    document.getElementById('uploadProgress').style.display = 'block';
-    document.getElementById('uploadStatus').textContent = `Загрузка 0 из ${files.length}`;
-    
-    let uploadedCount = 0;
-    
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        
-        const formData = new FormData();
-        formData.append('topic_id', albumId);
-        formData.append('photo', file);
-        
-        try {
-            const response = await fetch(`${CONFIG.WORKER_URL}/api/upload-photo`, {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (response.ok) {
-                uploadedCount++;
-                const progress = (uploadedCount / files.length) * 100;
-                document.getElementById('uploadProgressBar').style.width = progress + '%';
-                document.getElementById('uploadStatus').textContent = `Загружено ${uploadedCount} из ${files.length}`;
-            }
-        } catch (error) {
-            console.error('Ошибка загрузки:', error);
-        }
-    }
-    
-    setTimeout(() => {
-        closeUploadModal();
-        alert(`Загружено ${uploadedCount} из ${files.length} фото`);
-        // Обновляем список фото
-        loadPhotos();
-    }, 1000);
-}
     </script>
-<!-- Модальное окно загрузки фото -->
-<div class="modal-overlay" id="uploadModal">
-    <div class="modal" style="max-width: 400px;">
-        <h3>Загрузить фото в альбом</h3>
-        <input type="file" id="photoUpload" accept="image/*" multiple>
-        <div class="modal-buttons" style="margin-top: 20px;">
-            <button class="modal-btn secondary" onclick="closeUploadModal()">Отмена</button>
-            <button class="modal-btn primary" onclick="uploadPhotos()">Загрузить</button>
-        </div>
-        <div id="uploadProgress" style="margin-top: 15px; display: none;">
-            <div style="background: #f0f0f0; height: 20px; border-radius: 10px; overflow: hidden;">
-                <div id="uploadProgressBar" style="background: #4CAF50; height: 100%; width: 0%; transition: width 0.3s;"></div>
-            </div>
-            <div id="uploadStatus" style="text-align: center; margin-top: 5px; font-size: 12px;"></div>
-        </div>
-    </div>
-</div>
-
 </body>
 </html>
