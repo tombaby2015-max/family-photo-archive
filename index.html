@@ -624,49 +624,77 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
             document.getElementById('folderNameInput').value = '';
         }
         
-        async function createFolder() {
-            const folderName = document.getElementById('folderNameInput').value.trim();
-            
-            if (!folderName) {
-                showNotification('Введите название папки', 'error');
-                return;
-            }
-            
-            showLoader();
-            
-            try {
-                // 1. Создаём тему в Telegram
-                const response = await fetch(`${CONFIG.WORKER_URL}/api/create-topic`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: folderName })
-                });
-                
-                if (!response.ok) throw new Error('Ошибка создания темы');
-                
-                const data = await response.json();
-                
-                if (data.status !== 'success') {
-                    throw new Error(data.message || 'Ошибка создания темы');
-                }
-                
-                // 2. Добавляем в локальный массив
-                const newAlbum = {
-                    id: data.topic_id,
-                    title: folderName,
-                    cover_photo: null,
-                    photo_count: 0,
-                    created_at: new Date().toISOString().split('T')[0]
-                };
-                
-                albums.push(newAlbum);
-                
-                // 3. Обновляем отображение
-                renderAlbums();
-                
-                // 4. Закрываем модальное окно и показываем уведомление
-                closeCreateFolderModal();
-                showNotification(`Папка "${folderName}" создана!`, 'success');
+        // Временная функция для создания папки (без GitHub)
+async function createFolder() {
+    const folderName = document.getElementById('folderNameInput').value.trim();
+    
+    if (!folderName) {
+        showNotification('Введите название папки', 'error');
+        return;
+    }
+    
+    showLoader();
+    
+    try {
+        // Создаём тему в Telegram
+        const response = await fetch(`${CONFIG.WORKER_URL}/api/create-topic`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: folderName })
+        });
+        
+        if (!response.ok) throw new Error('Ошибка создания темы');
+        
+        const data = await response.json();
+        
+        if (data.status !== 'success') {
+            throw new Error(data.message || 'Ошибка создания темы');
+        }
+        
+        // Добавляем в локальный массив (временное решение)
+        const newAlbum = {
+            id: data.topic_id,
+            title: folderName,
+            cover_photo: null,
+            photo_count: 0,
+            created_at: new Date().toISOString().split('T')[0]
+        };
+        
+        albums.push(newAlbum);
+        
+        // Обновляем отображение
+        renderAlbums();
+        
+        // Закрываем модальное окно
+        closeCreateFolderModal();
+        
+        // Показываем уведомление
+        showNotification(`Папка "${folderName}" создана! ID: ${data.topic_id}`, 'success');
+        
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showNotification(`Ошибка: ${error.message}`, 'error');
+    } finally {
+        hideLoader();
+    }
+}
+
+// И временная функция загрузки (пустой массив)
+async function loadAlbums() {
+    showLoader();
+    
+    try {
+        // Временно используем пустой массив
+        albums = [];
+        renderAlbums();
+    } catch (error) {
+        console.error('Ошибка:', error);
+        albums = [];
+        renderAlbums();
+    } finally {
+        hideLoader();
+    }
+}
                 
                 // TODO: Обновить photos.json на GitHub
                 
