@@ -380,7 +380,8 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
         const CONFIG = {
             WORKER_URL: 'https://family-photos-worker.belovolov-email.workers.dev',
             ADMIN_PASSWORD: 'dima1105',
-            DEFAULT_COVER: 'https://cdn4.iconfinder.com/data/icons/interface-52/100/folder-512.png'
+            DEFAULT_COVER: 'https://cdn4.iconfinder.com/data/icons/interface-52/100/folder-512.png',
+            GITHUB_REPO: 'tombaby2015-max/family-photo-archive'
         };
         
         // Глобальные переменные
@@ -393,6 +394,7 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
             const savedSession = localStorage.getItem('photoArchiveAdmin');
             if (savedSession === CONFIG.ADMIN_PASSWORD) {
                 isAdmin = true;
+                updateAdminUI();
             }
             
             // Загружаем альбомы
@@ -408,11 +410,23 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
             });
         });
         
+        // Обновление интерфейса админки
+        function updateAdminUI() {
+            const adminGear = document.getElementById('adminGear');
+            if (adminGear) {
+                adminGear.style.display = 'flex';
+                adminGear.title = isAdmin ? 'Выйти из админки (кликните)' : 'Войти в админку';
+            }
+            
+            // Принудительно перерисовываем альбомы
+            renderAlbums();
+        }
+        
         // Функции уведомлений
-        function showNotification(message, type = 'info') {
+        function showNotification(message, type = 'success') {
             const notification = document.getElementById('notification');
             notification.textContent = message;
-            notification.className = `notification ${type === 'success' ? 'success' : 'error'}`;
+            notification.className = `notification ${type}`;
             notification.style.display = 'block';
             
             setTimeout(() => {
@@ -449,7 +463,7 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
                 localStorage.setItem('photoArchiveAdmin', password);
                 document.getElementById('adminModal').style.display = 'none';
                 document.getElementById('adminPassword').value = '';
-                loadAlbums();
+                updateAdminUI();
                 showNotification('Вы вошли в админку', 'success');
             } else {
                 errorDiv.style.display = 'block';
@@ -462,60 +476,102 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
         function logoutAdmin() {
             isAdmin = false;
             localStorage.removeItem('photoArchiveAdmin');
-            loadAlbums();
+            updateAdminUI();
             showNotification('Вы вышли из админки', 'success');
         }
         
-        // Загрузка альбомов (локальное хранилище)
-        function loadAlbums() {
+        // Загрузка альбомов
+        async function loadAlbums() {
             showLoader();
             
             try {
+                // Сначала пробуем загрузить с GitHub
+                const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        albums = data.albums || [];
+                        // Сохраняем в localStorage как резервную копию
+                        localStorage.setItem('familyPhotoAlbums', JSON.stringify(albums));
+                    } else {
+                        throw new Error(data.message);
+                    }
+                } else {
+                    // Если не удалось загрузить с GitHub, используем localStorage
+                    throw new Error('GitHub недоступен');
+                }
+            } catch (error) {
+                console.log('Используем локальное хранилище:', error.message);
                 // Загружаем из localStorage
                 const saved = localStorage.getItem('familyPhotoAlbums');
                 if (saved) {
-                    const data = JSON.parse(saved);
-                    albums = data.albums || [];
+                    albums = JSON.parse(saved);
                 } else {
                     albums = [];
                 }
-                
-                renderAlbums();
-            } catch (error) {
-                console.error('Ошибка:', error);
-                albums = [];
-                renderAlbums();
             } finally {
+                renderAlbums();
                 hideLoader();
             }
         }
         
-        // Сохранение альбомов в localStorage
-        function saveAlbums() {
-            const data = {
-                albums: albums,
-                last_updated: new Date().toISOString(),
-                version: '1.0'
-            };
-            localStorage.setItem('familyPhotoAlbums', JSON.stringify(data));
+        // Сохранение альбомов
+        async function saveAlbums() {
+            try {
+                // Сохраняем в localStorage
+                localStorage.setItem('familyPhotoAlbums', JSON.stringify(albums));
+                
+                // Пробуем сохранить на GitHub через Worker
+                const response = await fetch(`${CONFIG.WORKER_URL}/api/save-albums`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ albums })
+                });
+                
+                if (!response.ok) {
+                    console.warn('Не удалось сохранить на GitHub, используем локальное хранилище');
+                }
+            } catch (error) {
+                console.error('Ошибка сохранения:', error);
+            }
         }
         
-        // Отображение альбомов
+        // Отображение альбомов (ИСПРАВЛЕННАЯ ЛОГИКА!)
         function renderAlbums() {
             const container = document.getElementById('dynamicAlbums');
             let html = '';
             
-            // Группируем по 3 в строку (как в вашем дизайне)
-            for (let i = 0; i < albums.length; i += 3) {
+            // Очищаем контейнер
+            container.innerHTML = '';
+            
+            // Если нет альбомов и мы не админ
+            if (albums.length === 0 && !isAdmin) {
+                html = `
+                    <div class="r t-rec t-rec_pt_30" style="padding-top:30px; text-align: center; color: #666;">
+                        <p>Пока нет ни одного альбома</p>
+                        <p>Для создания альбомов войдите в админку</p>
+                    </div>
+                `;
+                container.innerHTML = html;
+                return;
+            }
+            
+            // Группируем альбомы по 3 в строку
+            for (let i = 0; i < Math.max(albums.length, 1); i += 3) {
+                const rowAlbums = albums.slice(i, i + 3);
+                
                 html += `
                     <div class="r t-rec t-rec_pt_30" style="padding-top:30px;" data-record-type="147">
                         <div class="t214">
                             <ul class="t214__container t-card__container t-container t-container_flex">
                 `;
                 
-                // Три альбома в строке
+                // Добавляем до 3 альбомов в строку
                 for (let j = 0; j < 3; j++) {
-                    const album = albums[i + j];
+                    const album = rowAlbums[j];
                     
                     if (album) {
                         const coverUrl = album.cover_photo ? 
@@ -532,16 +588,6 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
                                 <div class="folder-count">${album.photo_count || 0} фото</div>
                             </li>
                         `;
-                    } else if (isAdmin && j === 0 && i === albums.length) {
-                        // Кнопка "+" если в админке и это последняя строка
-                        html += `
-                            <li class="t214__col t-item t-card__col t-col t-col_4 add-folder" onclick="showCreateFolderModal()">
-                                <div class="t214__blockimg t-bgimg" style="background: #f9f9f9; display: flex; align-items: center; justify-content: center;">
-                                    <div class="plus">+</div>
-                                </div>
-                                <div class="folder-label">Добавить папку</div>
-                            </li>
-                        `;
                     } else {
                         // Пустая ячейка
                         html += '<li class="t214__col t-item t-card__col t-col t-col_4"></li>';
@@ -551,33 +597,8 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
                 html += '</ul></div></div>';
             }
             
-            // Если нет альбомов
-            if (albums.length === 0) {
-                if (isAdmin) {
-                    html = `
-                        <div class="r t-rec t-rec_pt_30" style="padding-top:30px;" data-record-type="147">
-                            <div class="t214">
-                                <ul class="t214__container t-card__container t-container t-container_flex">
-                                    <li class="t214__col t-item t-card__col t-col t-col_4 add-folder" onclick="showCreateFolderModal()">
-                                        <div class="t214__blockimg t-bgimg" style="background: #f9f9f9; display: flex; align-items: center; justify-content: center;">
-                                            <div class="plus">+</div>
-                                        </div>
-                                        <div class="folder-label">Добавить папку</div>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    html = `
-                        <div class="r t-rec t-rec_pt_30" style="padding-top:30px; text-align: center; color: #666;">
-                            <p>Пока нет ни одного альбома</p>
-                            <p>Для создания альбомов войдите в админку</p>
-                        </div>
-                    `;
-                }
-            } else if (isAdmin && albums.length % 3 === 0) {
-                // Если есть альбомы и мы в админке, добавляем кнопку "+" в новую строку
+            // Добавляем кнопку "+" в отдельной строке если мы админ
+            if (isAdmin) {
                 html += `
                     <div class="r t-rec t-rec_pt_30" style="padding-top:30px;" data-record-type="147">
                         <div class="t214">
@@ -599,6 +620,10 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
         
         // Создание папки
         function showCreateFolderModal() {
+            if (!isAdmin) {
+                showNotification('Войдите в админку для создания папок', 'error');
+                return;
+            }
             document.getElementById('createFolderModal').style.display = 'flex';
             document.getElementById('folderNameInput').focus();
         }
@@ -626,11 +651,6 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
                     body: JSON.stringify({ title: folderName })
                 });
                 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP ${response.status}: ${errorText}`);
-                }
-                
                 const data = await response.json();
                 
                 if (data.status !== 'success') {
@@ -643,13 +663,14 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
                     title: folderName,
                     cover_photo: null,
                     photo_count: 0,
+                    photos: [],
                     created_at: new Date().toISOString().split('T')[0]
                 };
                 
                 albums.push(newAlbum);
                 
-                // Сохраняем в localStorage
-                saveAlbums();
+                // Сохраняем
+                await saveAlbums();
                 
                 // Обновляем отображение
                 renderAlbums();
@@ -669,13 +690,16 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
         }
         
         function openAlbum(albumId) {
-    // Находим альбом
-    const album = albums.find(a => a.id === albumId);
-    if (!album) return;
-    
-    // Переходим на страницу галереи
-    window.location.href = `album.html?id=${albumId}&title=${encodeURIComponent(album.title)}`;
-}
+            // Находим альбом
+            const album = albums.find(a => a.id === albumId);
+            if (!album) {
+                showNotification('Альбом не найден', 'error');
+                return;
+            }
+            
+            // Переходим на страницу галереи
+            window.location.href = `album.html?id=${albumId}&title=${encodeURIComponent(album.title)}`;
+        }
     </script>
 </body>
 </html>
