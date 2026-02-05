@@ -4,11 +4,36 @@
       "id": 52,
       "title": "444",
       "cover_photo": null,
-      "photo_count": 0,
-      "photos": [],
+      "photo_count": 4,
+      "photos": [
+        {
+          "file_id": "AgACAgIAAyEGAATgcPPYAAM1aYTEvlGEhcE8kR-q1cs4P52prY0AAqwQaxtv7yhIajlbJhRaygsBAAMCAAN3AAM4BA",
+          "message_id": 53,
+          "type": "photo",
+          "uploaded_at": "2026-02-05T16:26:38.394Z"
+        },
+        {
+          "file_id": "AgACAgIAAyEGAATgcPPYAAM2aYTEwaQLgjlJ9yLBxB75HPwbeRUAAq0Qaxtv7yhIg1aiWLtGvg4BAAMCAAN3AAM4BA",
+          "message_id": 54,
+          "type": "photo",
+          "uploaded_at": "2026-02-05T16:26:41.384Z"
+        },
+        {
+          "file_id": "AgACAgIAAyEGAATgcPPYAAM3aYTEw3h9UVjZPfI230sHQlRuDFYAAq4Qaxtv7yhIzE6zAWx1NFIBAAMCAAN3AAM4BA",
+          "message_id": 55,
+          "type": "photo",
+          "uploaded_at": "2026-02-05T16:26:44.259Z"
+        },
+        {
+          "file_id": "AgACAgIAAyEGAATgcPPYAAM4aYTExi_IZYQ4OQaFzgrr_RiDMuUAArAQaxtv7yhI_45R-SK2LvABAAMCAAN3AAM4BA",
+          "message_id": 56,
+          "type": "photo",
+          "uploaded_at": "2026-02-05T16:26:46.690Z"
+        }
+      ],
       "created_at": "2026-02-05T16:26:15.427Z"
     }
   ],
-  "last_updated": "2026-02-05T16:26:16.157Z",
+  "last_updated": "2026-02-05T16:26:47.597Z",
   "version": "1.0"
 }
