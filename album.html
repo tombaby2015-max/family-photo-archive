@@ -792,44 +792,90 @@
         
 async function saveAlbumData() {
     try {
-        console.log('Сохранение данных альбома...');
+        console.log('Сохранение данных альбома ID:', albumId);
         
-        // Вариант 1: Используем новый endpoint для обновления одного альбома
-        const response = await fetch(`${CONFIG.WORKER_URL}/api/update-album`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                album_id: albumId,
-                album_data: albumData
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            console.log('Альбом успешно обновлен');
-            return true;
-        } else {
-            console.error('Ошибка обновления альбома:', data.message);
-            
-            // Вариант 2: Fallback - обновляем все альбомы
-            return await saveAllAlbums();
-        }
-    } catch (error) {
-        console.error('Ошибка сохранения альбома:', error);
-        
-        // Вариант 3: Пробуем сохранить все альбомы
+        // Вариант 1: Прямое обновление через endpoint (если он есть)
         try {
-            return await saveAllAlbums();
-        } catch (fallbackError) {
-            console.error('Fallback тоже не сработал:', fallbackError);
-            throw error;
+            const response = await fetch(`${CONFIG.WORKER_URL}/api/update-album`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    album_id: albumId,
+                    album_data: albumData
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                console.log('Альбом успешно обновлен через /api/update-album');
+                return true;
+            }
+        } catch (error) {
+            console.log('Endpoint /api/update-album не доступен, используем fallback');
         }
+        
+        // Вариант 2: Обновляем через /api/save-albums (полная перезапись)
+        const allAlbumsResponse = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
+        const allAlbumsData = await allAlbumsResponse.json();
+        
+        if (allAlbumsData.status === 'success') {
+            let allAlbums = allAlbumsData.albums || [];
+            
+            console.log('Получено альбомов с сервера:', allAlbums.length);
+            
+            // УДАЛЯЕМ ВСЕ старые версии этого альбома
+            allAlbums = allAlbums.filter(album => parseInt(album.id) !== parseInt(albumId));
+            
+            // Добавляем ТОЛЬКО ОДНУ актуальную версию
+            if (albumData) {
+                allAlbums.push(albumData);
+                console.log('Добавлен обновленный альбом, всего альбомов:', allAlbums.length);
+            }
+            
+            // Сохраняем все альбомы
+            const saveResponse = await fetch(`${CONFIG.WORKER_URL}/api/save-albums`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ albums: allAlbums })
+            });
+            
+            const saveData = await saveResponse.json();
+            
+            if (saveData.status === 'success') {
+                console.log('Все альбомы успешно сохранены');
+                return true;
+            } else {
+                throw new Error(saveData.message || 'Ошибка сохранения альбомов');
+            }
+        }
+        
+        throw new Error('Не удалось получить альбомы с сервера');
+        
+    } catch (error) {
+        console.error('Критическая ошибка сохранения альбома:', error);
+        
+        // Экстренный вариант: сохраняем в localStorage
+        try {
+            const emergencyData = {
+                albums: [albumData],
+                last_updated: new Date().toISOString(),
+                version: '1.0'
+            };
+            localStorage.setItem('emergency_album_backup', JSON.stringify(emergencyData));
+            console.log('Экстренная копия сохранена в localStorage');
+        } catch (localError) {
+            console.error('Даже localStorage не сработал:', localError);
+        }
+        
+        throw error;
     }
 }
-
+        
 // Вспомогательная функция для сохранения всех альбомов
 async function saveAllAlbums() {
     const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
