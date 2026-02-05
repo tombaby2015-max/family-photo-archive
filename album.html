@@ -358,44 +358,6 @@
             font-size: 14px;
             color: #666;
         }
-        
-        /* Стили для видео */
-        .video-thumbnail {
-            position: relative;
-            width: 100%;
-            height: 200px;
-            overflow: hidden;
-        }
-        
-        .video-thumbnail video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .video-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.7);
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            color: white;
-        }
-        
-        /* Обновление модального окна для видео */
-        .modal-video {
-            max-width: 90%;
-            max-height: 80vh;
-            width: auto;
-            height: auto;
-        }
     </style>
 </head>
 <body>
@@ -473,7 +435,7 @@
     <script>
         // Получаем параметры из URL
         const urlParams = new URLSearchParams(window.location.search);
-        const albumId = parseInt(urlParams.get('id'));
+        const albumId = urlParams.get('id');
         const albumTitle = urlParams.get('title') || 'Альбом';
         
         // Конфигурация
@@ -522,17 +484,12 @@
             try {
                 // Загружаем все альбомы
                 const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
                 const data = await response.json();
                 
                 if (data.status === 'success') {
                     // Находим нужный альбом
                     const allAlbums = data.albums || [];
-                    albumData = allAlbums.find(album => parseInt(album.id) === albumId);
+                    albumData = allAlbums.find(album => album.id == albumId);
                     
                     if (albumData) {
                         photos = albumData.photos || [];
@@ -590,24 +547,11 @@
             photos.forEach((photo, index) => {
                 const photoUrl = `${CONFIG.WORKER_URL}/api/get-photo?file_id=${photo.file_id}`;
                 
-                if (photo.type === 'video') {
-                    html += `
-                        <div class="photo-item" onclick="openModal(${index})">
-                            <div class="video-thumbnail">
-                                <video class="photo-img" preload="metadata">
-                                    <source src="${photoUrl}" type="video/mp4">
-                                </video>
-                                <div class="video-icon">▶️</div>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    html += `
-                        <div class="photo-item" onclick="openModal(${index})">
-                            <img src="${photoUrl}" alt="Фото ${index + 1}" class="photo-img" loading="lazy">
-                        </div>
-                    `;
-                }
+                html += `
+                    <div class="photo-item" onclick="openModal(${index})">
+                        <img src="${photoUrl}" alt="Фото ${index + 1}" class="photo-img" loading="lazy">
+                    </div>
+                `;
             });
             
             grid.innerHTML = html;
@@ -633,36 +577,8 @@
             
             const photo = photos[currentPhotoIndex];
             const photoUrl = `${CONFIG.WORKER_URL}/api/get-photo?file_id=${photo.file_id}`;
-            const modalImage = document.getElementById('modalImage');
-            const modalContent = document.querySelector('.modal-content');
             
-            if (photo.type === 'video') {
-                // Для видео
-                modalImage.style.display = 'none';
-                
-                // Удаляем старый видео элемент если есть
-                const oldVideo = modalContent.querySelector('video');
-                if (oldVideo) oldVideo.remove();
-                
-                // Создаем новый видео элемент
-                const videoElement = document.createElement('video');
-                videoElement.className = 'modal-video';
-                videoElement.controls = true;
-                videoElement.autoplay = true;
-                videoElement.innerHTML = `<source src="${photoUrl}" type="video/mp4">Ваш браузер не поддерживает видео.`;
-                
-                // Вставляем видео после картинки
-                modalImage.parentNode.insertBefore(videoElement, modalImage.nextSibling);
-            } else {
-                // Для фото
-                modalImage.src = photoUrl;
-                modalImage.style.display = 'block';
-                
-                // Удаляем видео элемент если есть
-                const videoElement = modalContent.querySelector('video');
-                if (videoElement) videoElement.remove();
-            }
-            
+            document.getElementById('modalImage').src = photoUrl;
             document.getElementById('photoInfo').textContent = `Фото ${currentPhotoIndex + 1} из ${photos.length}`;
         }
         
@@ -705,7 +621,7 @@
             // Создаём временную ссылку для скачивания
             const link = document.createElement('a');
             link.href = photoUrl;
-            link.download = photo.type === 'video' ? `video_${currentPhotoIndex + 1}.mp4` : `photo_${currentPhotoIndex + 1}.jpg`;
+            link.download = `photo_${currentPhotoIndex + 1}.jpg`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -715,6 +631,7 @@
             if (!isAdmin || photos.length === 0) return;
             
             if (confirm('Вы уверены, что хотите удалить это фото?')) {
+                // TODO: Реализовать удаление фото через Worker
                 alert('Удаление фото будет реализовано в следующем обновлении');
             }
         }
@@ -733,174 +650,125 @@
         function closeUploadModal() {
             document.getElementById('uploadModal').style.display = 'none';
         }
-
-async function uploadPhotos() {
-
-    console.log('=== НАЧАЛО ЗАГРУЗКИ ФОТО ===');
-console.log('albumId:', albumId);
-console.log('albumTitle:', albumTitle);
-console.log('Worker URL:', CONFIG.WORKER_URL);
-    
-    const files = document.getElementById('photoUpload').files;
-    
-    if (files.length === 0) {
-        alert('Выберите файлы для загрузки');
-        return;
-    }
-    
-    // Показываем прогресс
-    document.getElementById('uploadProgress').style.display = 'block';
-    document.getElementById('uploadStatus').textContent = `Загрузка 0 из ${files.length}`;
-    document.getElementById('uploadProgressBar').style.width = '0%';
-    
-    let uploadedCount = 0;
-    let errors = [];
-    
-    console.log('Начало загрузки файлов:', files.length, 'файлов');
-    
-    for (let i = 0; i < files.length; i++) {
-        const file = files[i];
         
-        console.log('Обработка файла:', file.name, 'тип:', file.type, 'размер:', file.size, 'байт');
-        
- // Определяем тип файла и максимальный размер
-const isImage = file.type.startsWith('image/');
-const maxSizeImage = 10 * 1024 * 1024; // 10MB для фото
-
-if (!isImage) {
-    errors.push(`${file.name}: поддерживаются только фото (JPEG, PNG и т.д.)`);
-    console.warn('Неподдерживаемый тип файла:', file.type);
-    continue;
-}
-
-if (file.size > maxSizeImage) {
-    errors.push(`${file.name}: слишком большой файл (максимум 10MB)`);
-    console.warn('Файл слишком большой:', file.name);
-    continue;
-}
-        
-        const formData = new FormData();
-        formData.append('topic_id', albumId);
-        formData.append('photo', file);
-        
-        console.log('Отправляем запрос на загрузку:', file.name);
-        
-        try {
-            const response = await fetch(`${CONFIG.WORKER_URL}/api/upload-photo`, {
-                method: 'POST',
-                body: formData
-            });
+        async function uploadPhotos() {
+            const files = document.getElementById('photoUpload').files;
             
-            console.log('Ответ получен, статус:', response.status);
-            
-            const data = await response.json();
-            console.log('Данные ответа:', data);
-            
-            if (data.status === 'success') {
-                uploadedCount++;
-                console.log('Файл успешно загружен:', file.name, 'file_id:', data.file_id);
-                
-                // Добавляем фото в локальный массив
-                photos.push({
-                    file_id: data.file_id,
-                    message_id: data.message_id,
-                    type: data.type || 'photo',
-                    uploaded_at: new Date().toISOString()
-                });
-                
-                // Обновляем прогресс
-                const progress = (uploadedCount / files.length) * 100;
-                document.getElementById('uploadProgressBar').style.width = progress + '%';
-                document.getElementById('uploadStatus').textContent = `Загружено ${uploadedCount} из ${files.length}`;
-            } else {
-                console.error('Ошибка загрузки:', data.message);
-                errors.push(`${file.name}: ${data.message || 'Ошибка загрузки'}`);
-            }
-        } catch (error) {
-            console.error('Ошибка сети:', error);
-            errors.push(`${file.name}: ${error.message}`);
-        }
-    }
-    
-    console.log('Загрузка завершена. Успешно:', uploadedCount, 'ошибки:', errors.length);
-    
-    // Обновляем альбом
-    if (uploadedCount > 0) {
-        // Обновляем данные альбома
-        if (!albumData) albumData = {};
-        albumData.photos = photos;
-        albumData.photo_count = photos.length;
-        albumData.id = albumId;
-        albumData.title = decodeURIComponent(albumTitle);
-        
-        // Сохраняем обновленные данные
-        await saveAlbumData();
-        
-        // Обновляем отображение
-        updatePhotoCount();
-        renderPhotos();
-    }
-    
-    // Закрываем модальное окно
-    setTimeout(() => {
-        closeUploadModal();
-        
-        // Показываем результат
-        if (errors.length > 0) {
-            let message = `Загружено ${uploadedCount} из ${files.length} файлов\n`;
-            message += 'Ошибки:\n' + errors.join('\n');
-            alert(message);
-        } else if (uploadedCount === 0) {
-            alert('Ни один файл не был загружен. Проверьте консоль браузера (F12) для подробностей.');
-        } else {
-            alert(`Успешно загружено ${uploadedCount} из ${files.length} файлов`);
-        }
-    }, 500);
-}
-        
-async function saveAlbumData() {
-    try {
-        console.log('Сохранение данных альбома...');
-        
-        // Загружаем все альбомы
-        const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
-        const data = await response.json();
-        
-        if (data.status === 'success') {
-            let allAlbums = data.albums || [];
-            console.log('Получено альбомов с сервера:', allAlbums.length);
-            
-            // Находим и обновляем нужный альбом
-            const index = allAlbums.findIndex(album => parseInt(album.id) === albumId);
-            if (index !== -1) {
-                console.log('Альбом найден, обновляем...');
-                allAlbums[index] = albumData;
-            } else {
-                console.log('Альбом не найден, добавляем новый...');
-                allAlbums.push(albumData);
+            if (files.length === 0) {
+                alert('Выберите файлы для загрузки');
+                return;
             }
             
-            console.log('Отправляем обновленные данные на сервер...');
+            // Показываем прогресс
+            document.getElementById('uploadProgress').style.display = 'block';
+            document.getElementById('uploadStatus').textContent = `Загрузка 0 из ${files.length}`;
+            document.getElementById('uploadProgressBar').style.width = '0%';
             
-            // Отправляем обновленные данные на сервер
-            const saveResponse = await fetch(`${CONFIG.WORKER_URL}/api/save-albums`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ albums: allAlbums })
-            });
+            let uploadedCount = 0;
+            let errors = [];
             
-            const saveData = await saveResponse.json();
-            console.log('Ответ от сервера сохранения:', saveData);
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                
+                // Проверяем размер файла (максимум 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    errors.push(`${file.name}: слишком большой файл (максимум 10MB)`);
+                    continue;
+                }
+                
+                const formData = new FormData();
+                formData.append('topic_id', albumId);
+                formData.append('photo', file);
+                
+                try {
+                    const response = await fetch(`${CONFIG.WORKER_URL}/api/upload-photo`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        uploadedCount++;
+                        
+                        // Добавляем фото в локальный массив
+                        photos.push({
+                            file_id: data.file_id,
+                            message_id: data.message_id,
+                            uploaded_at: new Date().toISOString()
+                        });
+                        
+                        // Обновляем прогресс
+                        const progress = (uploadedCount / files.length) * 100;
+                        document.getElementById('uploadProgressBar').style.width = progress + '%';
+                        document.getElementById('uploadStatus').textContent = `Загружено ${uploadedCount} из ${files.length}`;
+                    } else {
+                        errors.push(`${file.name}: ${data.message || 'Ошибка загрузки'}`);
+                    }
+                } catch (error) {
+                    errors.push(`${file.name}: ${error.message}`);
+                }
+            }
             
-        } else {
-            console.error('Ошибка получения альбомов:', data.message);
+            // Обновляем альбом
+            if (uploadedCount > 0) {
+                // Обновляем данные альбома
+                albumData.photos = photos;
+                albumData.photo_count = photos.length;
+                
+                // Сохраняем обновленные данные
+                await saveAlbumData();
+                
+                // Обновляем отображение
+                updatePhotoCount();
+                renderPhotos();
+            }
+            
+            // Закрываем модальное окно
+            setTimeout(() => {
+                closeUploadModal();
+                
+                // Показываем результат
+                let message = `Загружено ${uploadedCount} из ${files.length} фото`;
+                if (errors.length > 0) {
+                    message += '\nОшибки:\n' + errors.join('\n');
+                    alert(message);
+                } else {
+                    alert(message);
+                }
+            }, 500);
         }
-    } catch (error) {
-        console.error('Ошибка сохранения альбома:', error);
-    }
-}
+        
+        // Сохранение данных альбома
+        async function saveAlbumData() {
+            try {
+                // Загружаем все альбомы
+                const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    let allAlbums = data.albums || [];
+                    
+                    // Находим и обновляем нужный альбом
+                    const index = allAlbums.findIndex(album => album.id == albumId);
+                    if (index !== -1) {
+                        allAlbums[index] = albumData;
+                        
+                        // Отправляем обновленные данные на сервер
+                        await fetch(`${CONFIG.WORKER_URL}/api/save-albums`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ albums: allAlbums })
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка сохранения альбома:', error);
+            }
+        }
+        
         // Вспомогательные функции
         function showLoader() {
             document.getElementById('loader').style.display = 'flex';
