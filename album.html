@@ -454,7 +454,7 @@
     <div class="modal-overlay" id="uploadModal">
         <div class="modal">
             <h3>Загрузить фото в альбом</h3>
-            <input type="file" id="photoUpload" accept="image/*,video/*" multiple>
+            <input type="file" id="photoUpload" accept="image/*" multiple>
             
             <div class="upload-progress" id="uploadProgress">
                 <div class="progress-bar">
@@ -763,29 +763,21 @@ console.log('Worker URL:', CONFIG.WORKER_URL);
         
         console.log('Обработка файла:', file.name, 'тип:', file.type, 'размер:', file.size, 'байт');
         
-        // Определяем тип файла и максимальный размер
-        const isVideo = file.type.startsWith('video/');
-        const isImage = file.type.startsWith('image/');
-        const maxSizeVideo = 2 * 1024 * 1024 * 1024; // 2GB для видео
-        const maxSizeImage = 10 * 1024 * 1024; // 10MB для фото
-        
-        if (isImage && file.size > maxSizeImage) {
-            errors.push(`${file.name}: слишком большой файл (максимум 10MB для фото)`);
-            console.warn('Файл слишком большой для фото:', file.name);
-            continue;
-        }
-        
-        if (isVideo && file.size > maxSizeVideo) {
-            errors.push(`${file.name}: слишком большой файл (максимум 2GB для видео)`);
-            console.warn('Файл слишком большой для видео:', file.name);
-            continue;
-        }
-        
-        if (!isImage && !isVideo) {
-            errors.push(`${file.name}: поддерживаются только фото и видео файлы`);
-            console.warn('Неподдерживаемый тип файла:', file.type);
-            continue;
-        }
+ // Определяем тип файла и максимальный размер
+const isImage = file.type.startsWith('image/');
+const maxSizeImage = 10 * 1024 * 1024; // 10MB для фото
+
+if (!isImage) {
+    errors.push(`${file.name}: поддерживаются только фото (JPEG, PNG и т.д.)`);
+    console.warn('Неподдерживаемый тип файла:', file.type);
+    continue;
+}
+
+if (file.size > maxSizeImage) {
+    errors.push(`${file.name}: слишком большой файл (максимум 10MB)`);
+    console.warn('Файл слишком большой:', file.name);
+    continue;
+}
         
         const formData = new FormData();
         formData.append('topic_id', albumId);
