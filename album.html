@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Фотоальбом — админка</title>
+  <title>Фотоальбом</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
@@ -13,163 +13,230 @@
       color: #222;
     }
 
-    header {
-      background: #fff;
-      padding: 20px;
-      box-shadow: 0 1px 8px rgba(0,0,0,0.08);
+    /* ===== ШАПКА ===== */
+    .album-header {
+      position: relative;
+      background-size: cover;
+      background-position: center;
+      padding: 24px;
+      color: #fff;
+    }
+
+    .album-header::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+    }
+
+    .album-header-inner {
+      position: relative;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
     }
 
-    header h1 {
-      margin: 0;
-      font-size: 20px;
-      font-weight: 600;
-    }
-
-    .btn {
-      background: none;
-      border: 1px solid #ddd;
-      padding: 8px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-
-    .btn:hover {
-      background: #eee;
-    }
-
-    main {
-      max-width: 1200px;
-      margin: 30px auto;
-      padding: 0 20px;
-    }
-
-    .albums {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 20px;
-    }
-
-    .album {
-      background: #fff;
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: 0 3px 12px rgba(0,0,0,0.08);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .album img {
-      width: 100%;
-      height: 180px;
-      object-fit: cover;
-      background: #ddd;
-    }
-
-    .album-body {
-      padding: 14px;
-      flex: 1;
+    .back-btn {
+      color: #fff;
+      text-decoration: none;
+      font-size: 16px;
     }
 
     .album-title {
+      font-size: 20px;
       font-weight: 600;
-      margin-bottom: 6px;
-    }
-
-    .album-actions {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      margin-top: 12px;
-    }
-
-    .album-actions button {
+      text-align: center;
       flex: 1;
-      font-size: 13px;
     }
 
-    .danger {
-      border-color: #e57373;
-      color: #c62828;
+    .add-btn {
+      font-size: 14px;
+      color: #fff;
+      cursor: pointer;
     }
 
-    .danger:hover {
-      background: #fdecea;
+    /* ===== СЕТКА ===== */
+    .photos {
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 20px;
+    }
+
+    .photo {
+      cursor: pointer;
+    }
+
+    .photo img {
+      width: 100%;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+
+    /* ===== ПРОСМОТР ===== */
+    .viewer {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .viewer img {
+      max-width: 80%;
+      max-height: 80%;
+    }
+
+    .nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 40px;
+      color: #fff;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .nav.left { left: 30px; }
+    .nav.right { right: 30px; }
+
+    .close {
+      position: absolute;
+      top: 30px;
+      right: 30px;
+      font-size: 28px;
+      cursor: pointer;
+    }
+
+    .actions {
+      position: absolute;
+      bottom: 40px;
+      display: flex;
+      gap: 20px;
+    }
+
+    .actions a,
+    .actions button {
+      background: none;
+      border: 1px solid #fff;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
 
-<header>
-  <h1>Фотоальбом — управление</h1>
-  <button class="btn" onclick="createAlbum()">+ Создать папку</button>
-</header>
+<div class="album-header" id="header">
+  <div class="album-header-inner">
+    <a class="back-btn" href="index.html">← Назад</a>
+    <div class="album-title" id="albumTitle"></div>
+    <div class="add-btn">Добавить фото</div>
+  </div>
+</div>
 
-<main>
-  <div class="albums" id="albums"></div>
-</main>
+<div class="photos" id="photos"></div>
+
+<div class="viewer" id="viewer">
+  <div class="nav left" onclick="prev()">‹</div>
+  <img id="viewerImg">
+  <div class="nav right" onclick="next()">›</div>
+  <div class="close" onclick="closeViewer()">✕</div>
+  <div class="actions">
+    <a id="downloadBtn" download>Скачать</a>
+    <button id="deleteBtn" onclick="deletePhoto()">Удалить</button>
+  </div>
+</div>
 
 <script>
 const API = 'https://family-photos-worker.belovolov-email.workers.dev/api';
+const params = new URLSearchParams(location.search);
+const albumId = Number(params.get('id'));
+const title = params.get('title');
 
-async function loadAlbums() {
+let photos = [];
+let index = 0;
+
+document.getElementById('albumTitle').textContent = title;
+
+async function loadAlbum() {
   const res = await fetch(API + '/get-albums');
   const data = await res.json();
-  renderAlbums(data.albums || []);
+  const album = data.albums.find(a => a.id === albumId);
+
+  if (!album) return;
+
+  photos = album.photos;
+
+  if (album.cover_photo) {
+    document.getElementById('header').style.backgroundImage =
+      `url(${API.replace('/api','')}/api/get-photo?file_id=${album.cover_photo})`;
+  }
+
+  renderPhotos();
 }
 
-function renderAlbums(albums) {
-  const box = document.getElementById('albums');
+function renderPhotos() {
+  const box = document.getElementById('photos');
   box.innerHTML = '';
 
-  albums.forEach(a => {
-    const cover = a.cover_photo
-      ? API.replace('/api','') + '/api/get-photo?file_id=' + a.cover_photo
-      : '';
-
-    const div = document.createElement('div');
-    div.className = 'album';
-
-    div.innerHTML = `
-      <img src="${cover}">
-      <div class="album-body">
-        <div class="album-title">${a.title}</div>
-        <div>${a.photos.length} фото</div>
-
-        <div class="album-actions">
-          <button class="btn" onclick="openAlbum(${a.id}, '${a.title}')">Открыть</button>
-          <button class="btn danger" onclick="deleteAlbum(${a.id})">Удалить</button>
-        </div>
-      </div>
-    `;
-
-    box.appendChild(div);
+  photos.forEach((p, i) => {
+    const d = document.createElement('div');
+    d.className = 'photo';
+    d.innerHTML = `<img src="${API.replace('/api','')}/api/get-photo?file_id=${p.file_id}">`;
+    d.onclick = () => open(i);
+    box.appendChild(d);
   });
 }
 
-function openAlbum(id, title) {
-  location.href = `gallery.html?id=${id}&title=${encodeURIComponent(title)}`;
+function open(i) {
+  index = i;
+  document.getElementById('viewer').style.display = 'flex';
+  updateViewer();
 }
 
-async function deleteAlbum(id) {
-  if (!confirm('Удалить папку ТОЛЬКО с сайта?')) return;
-
-  await fetch(API + '/delete-album/' + id, { method: 'DELETE' });
-  loadAlbums();
+function updateViewer() {
+  const p = photos[index];
+  const url = API.replace('/api','') + '/api/get-photo?file_id=' + p.file_id;
+  document.getElementById('viewerImg').src = url;
+  document.getElementById('downloadBtn').href = url;
 }
 
-async function createAlbum() {
-  const title = prompt('Название папки');
-  if (!title) return;
-
-  // Telegram topic_id должен приходить с твоей логики создания темы
-  alert('Создание папки происходит через Telegram.\nСначала создай тему — потом обнови страницу.');
+function closeViewer() {
+  document.getElementById('viewer').style.display = 'none';
 }
 
-loadAlbums();
+function prev() {
+  if (index > 0) { index--; updateViewer(); }
+}
+
+function next() {
+  if (index < photos.length - 1) { index++; updateViewer(); }
+}
+
+async function deletePhoto() {
+  if (!confirm('Удалить фото только с сайта?')) return;
+
+  await fetch(API + '/delete-photo', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      albumId,
+      file_id: photos[index].file_id
+    })
+  });
+
+  photos.splice(index, 1);
+  closeViewer();
+  renderPhotos();
+}
+
+loadAlbum();
 </script>
 
 </body>
