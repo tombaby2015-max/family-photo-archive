@@ -4,7 +4,7 @@
       "id": 52,
       "title": "444",
       "cover_photo": null,
-      "photo_count": 5,
+      "photo_count": 6,
       "photos": [
         {
           "file_id": "AgACAgIAAyEGAATgcPPYAAM1aYTEvlGEhcE8kR-q1cs4P52prY0AAqwQaxtv7yhIajlbJhRaygsBAAMCAAN3AAM4BA",
@@ -35,11 +35,17 @@
           "message_id": 57,
           "type": "video",
           "uploaded_at": "2026-02-05T19:29:44.235Z"
+        },
+        {
+          "file_id": "AgACAgIAAyEGAATgcPPYAAM4aYTExi_IZYQ4OQaFzgrr_RiDMuUAArAQaxtv7yhI_45R-SK2LvABAAMCAAN3AAM4BA",
+          "message_id": 59,
+          "type": "photo",
+          "uploaded_at": "2026-02-05T19:39:30.642Z"
         }
       ],
       "created_at": "2026-02-05T16:26:15.427Z"
     }
   ],
-  "last_updated": "2026-02-05T19:29:45.156Z",
+  "last_updated": "2026-02-05T19:39:31.605Z",
   "version": "1.0"
 }
