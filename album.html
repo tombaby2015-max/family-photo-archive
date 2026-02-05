@@ -790,38 +790,73 @@
             }, 500);
         }
         
-        async function saveAlbumData() {
+async function saveAlbumData() {
     try {
-        // Загружаем все альбомы
-        const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
+        console.log('Сохранение данных альбома...');
+        
+        // Вариант 1: Используем новый endpoint для обновления одного альбома
+        const response = await fetch(`${CONFIG.WORKER_URL}/api/update-album`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                album_id: albumId,
+                album_data: albumData
+            })
+        });
+        
         const data = await response.json();
         
         if (data.status === 'success') {
-            let allAlbums = data.albums || [];
+            console.log('Альбом успешно обновлен');
+            return true;
+        } else {
+            console.error('Ошибка обновления альбома:', data.message);
             
-            // Находим и обновляем нужный альбом
-            const index = allAlbums.findIndex(album => parseInt(album.id) === albumId);
-            if (index !== -1) {
-                allAlbums[index] = albumData;
-            } else {
-                allAlbums.push(albumData);
-            }
-            
-            // Отправляем обновленные данные на сервер
-            await fetch(`${CONFIG.WORKER_URL}/api/save-albums`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ albums: allAlbums })
-            });
-            
-            console.log('Альбом сохранен');
+            // Вариант 2: Fallback - обновляем все альбомы
+            return await saveAllAlbums();
         }
     } catch (error) {
         console.error('Ошибка сохранения альбома:', error);
-        throw error; // Пробрасываем ошибку дальше для обработки
+        
+        // Вариант 3: Пробуем сохранить все альбомы
+        try {
+            return await saveAllAlbums();
+        } catch (fallbackError) {
+            console.error('Fallback тоже не сработал:', fallbackError);
+            throw error;
+        }
     }
+}
+
+// Вспомогательная функция для сохранения всех альбомов
+async function saveAllAlbums() {
+    const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
+    const data = await response.json();
+    
+    if (data.status === 'success') {
+        let allAlbums = data.albums || [];
+        
+        const index = allAlbums.findIndex(album => parseInt(album.id) === albumId);
+        if (index !== -1) {
+            allAlbums[index] = albumData;
+        } else {
+            allAlbums.push(albumData);
+        }
+        
+        await fetch(`${CONFIG.WORKER_URL}/api/save-albums`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ albums: allAlbums })
+        });
+        
+        console.log('Все альбомы сохранены (fallback)');
+        return true;
+    }
+    return false;
 }
         
         // Вспомогательные функции
@@ -832,6 +867,38 @@
         function hideLoader() {
             document.getElementById('loader').style.display = 'none';
         }
+        // Функция для показа уведомлений
+        function showNotification(message, type = 'success') {
+            // Создаем элемент уведомления
+            const notification = document.createElement('div');
+            notification.id = 'tempNotification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 20px;
+                border-radius: 5px;
+                color: white;
+                z-index: 10003;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                font-size: 14px;
+                box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+                background: ${type === 'success' ? '#4CAF50' : '#f44336'};
+            `;
+            notification.textContent = message;
+            
+            // Добавляем на страницу
+            document.body.appendChild(notification);
+            
+            // Удаляем через 3 секунды
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 3000);
+        }
+    </script>
+        
     </script>
 </body>
 </html>
