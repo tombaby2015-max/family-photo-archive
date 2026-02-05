@@ -492,21 +492,28 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
                     const data = await response.json();
                     if (data.status === 'success') {
                         albums = data.albums || [];
+                        console.log('Загружено с GitHub:', albums.length, 'альбомов');
+                        
                         // Сохраняем в localStorage как резервную копию
                         localStorage.setItem('familyPhotoAlbums', JSON.stringify(albums));
                     } else {
-                        throw new Error(data.message);
+                        throw new Error('Ошибка в данных с GitHub');
                     }
                 } else {
-                    // Если не удалось загрузить с GitHub, используем localStorage
                     throw new Error('GitHub недоступен');
                 }
             } catch (error) {
                 console.log('Используем локальное хранилище:', error.message);
+                
                 // Загружаем из localStorage
                 const saved = localStorage.getItem('familyPhotoAlbums');
                 if (saved) {
-                    albums = JSON.parse(saved);
+                    try {
+                        albums = JSON.parse(saved);
+                        console.log('Загружено из localStorage:', albums.length, 'альбомов');
+                    } catch (e) {
+                        albums = [];
+                    }
                 } else {
                     albums = [];
                 }
@@ -528,18 +535,22 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ albums })
+                    body: JSON.stringify({ albums: albums })
                 });
                 
-                if (!response.ok) {
-                    console.warn('Не удалось сохранить на GitHub, используем локальное хранилище');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    console.log('Альбомы сохранены на GitHub');
+                } else {
+                    console.warn('Не удалось сохранить на GitHub:', data.message);
                 }
             } catch (error) {
                 console.error('Ошибка сохранения:', error);
             }
         }
         
-        // Отображение альбомов (ИСПРАВЛЕННАЯ ЛОГИКА!)
+        // Отображение альбомов
         function renderAlbums() {
             const container = document.getElementById('dynamicAlbums');
             let html = '';
@@ -664,7 +675,7 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
                     cover_photo: null,
                     photo_count: 0,
                     photos: [],
-                    created_at: new Date().toISOString().split('T')[0]
+                    created_at: new Date().toISOString()
                 };
                 
                 albums.push(newAlbum);
@@ -691,7 +702,7 @@ document.addEventListener('DOMContentLoaded',t_setvisRecs);}})();</script>
         
         function openAlbum(albumId) {
             // Находим альбом
-            const album = albums.find(a => a.id === albumId);
+            const album = albums.find(a => parseInt(a.id) === parseInt(albumId));
             if (!album) {
                 showNotification('Альбом не найден', 'error');
                 return;
