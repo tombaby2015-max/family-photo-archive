@@ -358,6 +358,43 @@
             font-size: 14px;
             color: #666;
         }
+        /* Стили для видео */
+.video-thumbnail {
+    position: relative;
+    width: 100%;
+    height: 200px;
+    overflow: hidden;
+}
+
+.video-thumbnail video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+}
+
+/* Обновление модального окна для видео */
+.modal-video {
+    max-width: 90%;
+    max-height: 80vh;
+    width: auto;
+    height: auto;
+}
     </style>
 </head>
 <body>
@@ -416,7 +453,7 @@
     <div class="modal-overlay" id="uploadModal">
         <div class="modal">
             <h3>Загрузить фото в альбом</h3>
-            <input type="file" id="photoUpload" accept="image/*" multiple>
+            <input type="file" id="photoUpload" accept="image/*,video/*" multiple>
             
             <div class="upload-progress" id="uploadProgress">
                 <div class="progress-bar">
@@ -547,11 +584,24 @@
             photos.forEach((photo, index) => {
                 const photoUrl = `${CONFIG.WORKER_URL}/api/get-photo?file_id=${photo.file_id}`;
                 
-                html += `
-                    <div class="photo-item" onclick="openModal(${index})">
-                        <img src="${photoUrl}" alt="Фото ${index + 1}" class="photo-img" loading="lazy">
-                    </div>
-                `;
+                if (photo.type === 'video') {
+    html += `
+        <div class="photo-item" onclick="openModal(${index})">
+            <div class="video-thumbnail">
+                <video class="photo-img" preload="metadata">
+                    <source src="${photoUrl}" type="video/mp4">
+                </video>
+                <div class="video-icon">▶️</div>
+            </div>
+        </div>
+    `;
+} else {
+    html += `
+        <div class="photo-item" onclick="openModal(${index})">
+            <img src="${photoUrl}" alt="Фото ${index + 1}" class="photo-img" loading="lazy">
+        </div>
+    `;
+}
             });
             
             grid.innerHTML = html;
@@ -576,11 +626,26 @@
             if (photos.length === 0) return;
             
             const photo = photos[currentPhotoIndex];
-            const photoUrl = `${CONFIG.WORKER_URL}/api/get-photo?file_id=${photo.file_id}`;
-            
-            document.getElementById('modalImage').src = photoUrl;
-            document.getElementById('photoInfo').textContent = `Фото ${currentPhotoIndex + 1} из ${photos.length}`;
-        }
+const photoUrl = `${CONFIG.WORKER_URL}/api/get-photo?file_id=${photo.file_id}`;
+const modalContent = document.getElementById('modalImage');
+
+if (photo.type === 'video') {
+    // Для видео
+    modalContent.innerHTML = `
+        <video class="modal-video" controls autoplay>
+            <source src="${photoUrl}" type="video/mp4">
+            Ваш браузер не поддерживает видео.
+        </video>
+    `;
+    modalImageContainer.innerHTML = modalContent.innerHTML;
+} else {
+    // Для фото
+    modalContent.src = photoUrl;
+    modalContent.style.display = 'block';
+    // Удаляем возможные видео элементы
+    const videos = modalImageContainer.querySelectorAll('video');
+    videos.forEach(v => v.remove());
+}
         
         function nextPhoto() {
             if (photos.length === 0) return;
@@ -670,33 +735,34 @@
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 
-                // Проверяем размер файла (максимум 10MB)
-                if (file.size > 10 * 1024 * 1024) {
-                    errors.push(`${file.name}: слишком большой файл (максимум 10MB)`);
-                    continue;
-                }
-                
-                const formData = new FormData();
-                formData.append('topic_id', albumId);
-                formData.append('photo', file);
-                
-                try {
-                    const response = await fetch(`${CONFIG.WORKER_URL}/api/upload-photo`, {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.status === 'success') {
-                        uploadedCount++;
+               // Определяем тип файла и максимальный размер
+const isVideo = file.type.startsWith('video/');
+const isImage = file.type.startsWith('image/');
+const maxSizeVideo = 2 * 1024 * 1024 * 1024; // 2GB для видео
+const maxSizeImage = 10 * 1024 * 1024; // 10MB для фото
+
+if (isImage && file.size > maxSizeImage) {
+    errors.push(`${file.name}: слишком большой файл (максимум 10MB для фото)`);
+    continue;
+}
+
+if (isVideo && file.size > maxSizeVideo) {
+    errors.push(`${file.name}: слишком большой файл (максимум 2GB для видео)`);
+    continue;
+}
+
+if (!isImage && !isVideo) {
+    errors.push(`${file.name}: поддерживаются только фото и видео файлы`);
+    continue;
+}
                         
                         // Добавляем фото в локальный массив
-                        photos.push({
-                            file_id: data.file_id,
-                            message_id: data.message_id,
-                            uploaded_at: new Date().toISOString()
-                        });
+                       photos.push({
+    file_id: data.file_id,
+    message_id: data.message_id,
+    type: data.type || 'photo', // Добавляем тип файла
+    uploaded_at: new Date().toISOString()
+});
                         
                         // Обновляем прогресс
                         const progress = (uploadedCount / files.length) * 100;
