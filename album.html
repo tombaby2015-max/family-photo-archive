@@ -515,36 +515,52 @@
         });
         
         // Загрузка данных альбома
-        async function loadAlbumData() {
-            showLoader();
-            
-            try {
-                // Загружаем все альбомы
-                const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
-                const data = await response.json();
-                
-                if (data.status === 'success') {
-                    // Находим нужный альбом
-                    const allAlbums = data.albums || [];
-                    albumData = allAlbums.find(album => album.id == albumId);
-                    
-                    if (albumData) {
-                        photos = albumData.photos || [];
-                        updatePhotoCount();
-                        renderPhotos();
-                    } else {
-                        showEmptyState('Альбом не найден');
-                    }
-                } else {
-                    throw new Error(data.message || 'Ошибка загрузки данных');
-                }
-            } catch (error) {
-                console.error('Ошибка загрузки альбома:', error);
-                showEmptyState('Ошибка загрузки альбома');
-            } finally {
-                hideLoader();
-            }
+async function loadAlbumData() {
+    showLoader();
+    
+    try {
+        // Загружаем все альбомы
+        const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
         }
+        
+        const data = await response.json();
+        console.log('Получены данные альбомов:', data); // Для отладки
+        
+        if (data.status === 'success') {
+            // Находим нужный альбом
+            const allAlbums = data.albums || [];
+            console.log('Все альбомы:', allAlbums); // Для отладки
+            console.log('Ищем альбом с id:', albumId); // Для отладки
+            
+            albumData = allAlbums.find(album => {
+                console.log('Проверяем альбом:', album.id, 'тип:', typeof album.id, 'ищем:', albumId, 'тип:', typeof albumId);
+                return album.id == albumId; // Используем нестрогое сравнение
+            });
+            
+            console.log('Найден альбом:', albumData); // Для отладки
+            
+            if (albumData) {
+                photos = albumData.photos || [];
+                console.log('Фото в альбоме:', photos); // Для отладки
+                updatePhotoCount();
+                renderPhotos();
+            } else {
+                console.error('Альбом не найден в данных:', allAlbums);
+                showEmptyState('Альбом не найден');
+            }
+        } else {
+            throw new Error(data.message || 'Ошибка загрузки данных');
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки альбома:', error);
+        showEmptyState('Ошибка загрузки: ' + error.message);
+    } finally {
+        hideLoader();
+    }
+}
         
         // Обновление счетчика фото
         function updatePhotoCount() {
