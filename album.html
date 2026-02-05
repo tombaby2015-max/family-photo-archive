@@ -358,43 +358,44 @@
             font-size: 14px;
             color: #666;
         }
+        
         /* Стили для видео */
-.video-thumbnail {
-    position: relative;
-    width: 100%;
-    height: 200px;
-    overflow: hidden;
-}
-
-.video-thumbnail video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.video-icon {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.7);
-    border-radius: 50%;
-    width: 60px;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    color: white;
-}
-
-/* Обновление модального окна для видео */
-.modal-video {
-    max-width: 90%;
-    max-height: 80vh;
-    width: auto;
-    height: auto;
-}
+        .video-thumbnail {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            overflow: hidden;
+        }
+        
+        .video-thumbnail video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .video-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+        
+        /* Обновление модального окна для видео */
+        .modal-video {
+            max-width: 90%;
+            max-height: 80vh;
+            width: auto;
+            height: auto;
+        }
     </style>
 </head>
 <body>
@@ -472,7 +473,7 @@
     <script>
         // Получаем параметры из URL
         const urlParams = new URLSearchParams(window.location.search);
-        const albumId = urlParams.get('id');
+        const albumId = parseInt(urlParams.get('id'));
         const albumTitle = urlParams.get('title') || 'Альбом';
         
         // Конфигурация
@@ -515,52 +516,41 @@
         });
         
         // Загрузка данных альбома
-async function loadAlbumData() {
-    showLoader();
-    
-    try {
-        // Загружаем все альбомы
-        const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('Получены данные альбомов:', data); // Для отладки
-        
-        if (data.status === 'success') {
-            // Находим нужный альбом
-            const allAlbums = data.albums || [];
-            console.log('Все альбомы:', allAlbums); // Для отладки
-            console.log('Ищем альбом с id:', albumId); // Для отладки
+        async function loadAlbumData() {
+            showLoader();
             
-            albumData = allAlbums.find(album => {
-                console.log('Проверяем альбом:', album.id, 'тип:', typeof album.id, 'ищем:', albumId, 'тип:', typeof albumId);
-                return album.id == albumId; // Используем нестрогое сравнение
-            });
-            
-            console.log('Найден альбом:', albumData); // Для отладки
-            
-            if (albumData) {
-                photos = albumData.photos || [];
-                console.log('Фото в альбоме:', photos); // Для отладки
-                updatePhotoCount();
-                renderPhotos();
-            } else {
-                console.error('Альбом не найден в данных:', allAlbums);
-                showEmptyState('Альбом не найден');
+            try {
+                // Загружаем все альбомы
+                const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // Находим нужный альбом
+                    const allAlbums = data.albums || [];
+                    albumData = allAlbums.find(album => parseInt(album.id) === albumId);
+                    
+                    if (albumData) {
+                        photos = albumData.photos || [];
+                        updatePhotoCount();
+                        renderPhotos();
+                    } else {
+                        showEmptyState('Альбом не найден');
+                    }
+                } else {
+                    throw new Error(data.message || 'Ошибка загрузки данных');
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки альбома:', error);
+                showEmptyState('Ошибка загрузки альбома');
+            } finally {
+                hideLoader();
             }
-        } else {
-            throw new Error(data.message || 'Ошибка загрузки данных');
         }
-    } catch (error) {
-        console.error('Ошибка загрузки альбома:', error);
-        showEmptyState('Ошибка загрузки: ' + error.message);
-    } finally {
-        hideLoader();
-    }
-}
         
         // Обновление счетчика фото
         function updatePhotoCount() {
@@ -601,23 +591,23 @@ async function loadAlbumData() {
                 const photoUrl = `${CONFIG.WORKER_URL}/api/get-photo?file_id=${photo.file_id}`;
                 
                 if (photo.type === 'video') {
-    html += `
-        <div class="photo-item" onclick="openModal(${index})">
-            <div class="video-thumbnail">
-                <video class="photo-img" preload="metadata">
-                    <source src="${photoUrl}" type="video/mp4">
-                </video>
-                <div class="video-icon">▶️</div>
-            </div>
-        </div>
-    `;
-} else {
-    html += `
-        <div class="photo-item" onclick="openModal(${index})">
-            <img src="${photoUrl}" alt="Фото ${index + 1}" class="photo-img" loading="lazy">
-        </div>
-    `;
-}
+                    html += `
+                        <div class="photo-item" onclick="openModal(${index})">
+                            <div class="video-thumbnail">
+                                <video class="photo-img" preload="metadata">
+                                    <source src="${photoUrl}" type="video/mp4">
+                                </video>
+                                <div class="video-icon">▶️</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="photo-item" onclick="openModal(${index})">
+                            <img src="${photoUrl}" alt="Фото ${index + 1}" class="photo-img" loading="lazy">
+                        </div>
+                    `;
+                }
             });
             
             grid.innerHTML = html;
@@ -642,26 +632,39 @@ async function loadAlbumData() {
             if (photos.length === 0) return;
             
             const photo = photos[currentPhotoIndex];
-const photoUrl = `${CONFIG.WORKER_URL}/api/get-photo?file_id=${photo.file_id}`;
-const modalContent = document.getElementById('modalImage');
-
-if (photo.type === 'video') {
-    // Для видео
-    modalContent.innerHTML = `
-        <video class="modal-video" controls autoplay>
-            <source src="${photoUrl}" type="video/mp4">
-            Ваш браузер не поддерживает видео.
-        </video>
-    `;
-    modalImageContainer.innerHTML = modalContent.innerHTML;
-} else {
-    // Для фото
-    modalContent.src = photoUrl;
-    modalContent.style.display = 'block';
-    // Удаляем возможные видео элементы
-    const videos = modalImageContainer.querySelectorAll('video');
-    videos.forEach(v => v.remove());
-}
+            const photoUrl = `${CONFIG.WORKER_URL}/api/get-photo?file_id=${photo.file_id}`;
+            const modalImage = document.getElementById('modalImage');
+            const modalContent = document.querySelector('.modal-content');
+            
+            if (photo.type === 'video') {
+                // Для видео
+                modalImage.style.display = 'none';
+                
+                // Удаляем старый видео элемент если есть
+                const oldVideo = modalContent.querySelector('video');
+                if (oldVideo) oldVideo.remove();
+                
+                // Создаем новый видео элемент
+                const videoElement = document.createElement('video');
+                videoElement.className = 'modal-video';
+                videoElement.controls = true;
+                videoElement.autoplay = true;
+                videoElement.innerHTML = `<source src="${photoUrl}" type="video/mp4">Ваш браузер не поддерживает видео.`;
+                
+                // Вставляем видео после картинки
+                modalImage.parentNode.insertBefore(videoElement, modalImage.nextSibling);
+            } else {
+                // Для фото
+                modalImage.src = photoUrl;
+                modalImage.style.display = 'block';
+                
+                // Удаляем видео элемент если есть
+                const videoElement = modalContent.querySelector('video');
+                if (videoElement) videoElement.remove();
+            }
+            
+            document.getElementById('photoInfo').textContent = `Фото ${currentPhotoIndex + 1} из ${photos.length}`;
+        }
         
         function nextPhoto() {
             if (photos.length === 0) return;
@@ -702,7 +705,7 @@ if (photo.type === 'video') {
             // Создаём временную ссылку для скачивания
             const link = document.createElement('a');
             link.href = photoUrl;
-            link.download = `photo_${currentPhotoIndex + 1}.jpg`;
+            link.download = photo.type === 'video' ? `video_${currentPhotoIndex + 1}.mp4` : `photo_${currentPhotoIndex + 1}.jpg`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -712,7 +715,6 @@ if (photo.type === 'video') {
             if (!isAdmin || photos.length === 0) return;
             
             if (confirm('Вы уверены, что хотите удалить это фото?')) {
-                // TODO: Реализовать удаление фото через Worker
                 alert('Удаление фото будет реализовано в следующем обновлении');
             }
         }
@@ -751,34 +753,49 @@ if (photo.type === 'video') {
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 
-               // Определяем тип файла и максимальный размер
-const isVideo = file.type.startsWith('video/');
-const isImage = file.type.startsWith('image/');
-const maxSizeVideo = 2 * 1024 * 1024 * 1024; // 2GB для видео
-const maxSizeImage = 10 * 1024 * 1024; // 10MB для фото
-
-if (isImage && file.size > maxSizeImage) {
-    errors.push(`${file.name}: слишком большой файл (максимум 10MB для фото)`);
-    continue;
-}
-
-if (isVideo && file.size > maxSizeVideo) {
-    errors.push(`${file.name}: слишком большой файл (максимум 2GB для видео)`);
-    continue;
-}
-
-if (!isImage && !isVideo) {
-    errors.push(`${file.name}: поддерживаются только фото и видео файлы`);
-    continue;
-}
+                // Определяем тип файла и максимальный размер
+                const isVideo = file.type.startsWith('video/');
+                const isImage = file.type.startsWith('image/');
+                const maxSizeVideo = 2 * 1024 * 1024 * 1024; // 2GB для видео
+                const maxSizeImage = 10 * 1024 * 1024; // 10MB для фото
+                
+                if (isImage && file.size > maxSizeImage) {
+                    errors.push(`${file.name}: слишком большой файл (максимум 10MB для фото)`);
+                    continue;
+                }
+                
+                if (isVideo && file.size > maxSizeVideo) {
+                    errors.push(`${file.name}: слишком большой файл (максимум 2GB для видео)`);
+                    continue;
+                }
+                
+                if (!isImage && !isVideo) {
+                    errors.push(`${file.name}: поддерживаются только фото и видео файлы`);
+                    continue;
+                }
+                
+                const formData = new FormData();
+                formData.append('topic_id', albumId);
+                formData.append('photo', file);
+                
+                try {
+                    const response = await fetch(`${CONFIG.WORKER_URL}/api/upload-photo`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        uploadedCount++;
                         
                         // Добавляем фото в локальный массив
-                       photos.push({
-    file_id: data.file_id,
-    message_id: data.message_id,
-    type: data.type || 'photo', // Добавляем тип файла
-    uploaded_at: new Date().toISOString()
-});
+                        photos.push({
+                            file_id: data.file_id,
+                            message_id: data.message_id,
+                            type: data.type || 'photo',
+                            uploaded_at: new Date().toISOString()
+                        });
                         
                         // Обновляем прогресс
                         const progress = (uploadedCount / files.length) * 100;
@@ -795,8 +812,11 @@ if (!isImage && !isVideo) {
             // Обновляем альбом
             if (uploadedCount > 0) {
                 // Обновляем данные альбома
+                if (!albumData) albumData = {};
                 albumData.photos = photos;
                 albumData.photo_count = photos.length;
+                albumData.id = albumId;
+                albumData.title = decodeURIComponent(albumTitle);
                 
                 // Сохраняем обновленные данные
                 await saveAlbumData();
@@ -811,7 +831,7 @@ if (!isImage && !isVideo) {
                 closeUploadModal();
                 
                 // Показываем результат
-                let message = `Загружено ${uploadedCount} из ${files.length} фото`;
+                let message = `Загружено ${uploadedCount} из ${files.length} файлов`;
                 if (errors.length > 0) {
                     message += '\nОшибки:\n' + errors.join('\n');
                     alert(message);
@@ -832,19 +852,21 @@ if (!isImage && !isVideo) {
                     let allAlbums = data.albums || [];
                     
                     // Находим и обновляем нужный альбом
-                    const index = allAlbums.findIndex(album => album.id == albumId);
+                    const index = allAlbums.findIndex(album => parseInt(album.id) === albumId);
                     if (index !== -1) {
                         allAlbums[index] = albumData;
-                        
-                        // Отправляем обновленные данные на сервер
-                        await fetch(`${CONFIG.WORKER_URL}/api/save-albums`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ albums: allAlbums })
-                        });
+                    } else {
+                        allAlbums.push(albumData);
                     }
+                    
+                    // Отправляем обновленные данные на сервер
+                    await fetch(`${CONFIG.WORKER_URL}/api/save-albums`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ albums: allAlbums })
+                    });
                 }
             } catch (error) {
                 console.error('Ошибка сохранения альбома:', error);
