@@ -627,14 +627,65 @@
             document.body.removeChild(link);
         }
         
-        function deletePhoto() {
-            if (!isAdmin || photos.length === 0) return;
+        async function deletePhoto() {
+    if (!isAdmin || photos.length === 0) return;
+    
+    if (!confirm('Вы уверены, что хотите удалить это фото?\n\nФото останется в Telegram, но исчезнет с сайта.')) {
+        return;
+    }
+    
+    showLoader();
+    
+    try {
+        const photoToDelete = photos[currentPhotoIndex];
+        
+        // 1. Удаляем фото из локального массива
+        photos.splice(currentPhotoIndex, 1);
+        
+        // 2. Обновляем данные альбома
+        if (albumData) {
+            albumData.photos = photos;
+            albumData.photo_count = photos.length;
             
-            if (confirm('Вы уверены, что хотите удалить это фото?')) {
-                // TODO: Реализовать удаление фото через Worker
-                alert('Удаление фото будет реализовано в следующем обновлении');
+            // Если удалили обложку, выбираем новую
+            if (albumData.cover_photo === photoToDelete.file_id && photos.length > 0) {
+                // Ищем первую фото (не видео) для обложки
+                const firstPhoto = photos.find(p => p.type === 'photo');
+                if (firstPhoto) {
+                    albumData.cover_photo = firstPhoto.file_id;
+                } else {
+                    albumData.cover_photo = null;
+                }
             }
         }
+        
+        // 3. Сохраняем изменения в GitHub
+        await saveAlbumData();
+        
+        // 4. Обновляем отображение
+        updatePhotoCount();
+        renderPhotos();
+        
+        // 5. Закрываем модальное окно если больше нет фото
+        if (photos.length === 0) {
+            closeModal();
+        } else {
+            // Переходим к следующему фото
+            if (currentPhotoIndex >= photos.length) {
+                currentPhotoIndex = photos.length - 1;
+            }
+            updateModal();
+        }
+        
+        showNotification('Фото удалено с сайта', 'success');
+        
+    } catch (error) {
+        console.error('Ошибка удаления фото:', error);
+        showNotification('Ошибка при удалении фото', 'error');
+    } finally {
+        hideLoader();
+    }
+}
         
         // Загрузка фото
         function openUploadModal() {
@@ -739,35 +790,39 @@
             }, 500);
         }
         
-        // Сохранение данных альбома
         async function saveAlbumData() {
-            try {
-                // Загружаем все альбомы
-                const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
-                const data = await response.json();
-                
-                if (data.status === 'success') {
-                    let allAlbums = data.albums || [];
-                    
-                    // Находим и обновляем нужный альбом
-                    const index = allAlbums.findIndex(album => album.id == albumId);
-                    if (index !== -1) {
-                        allAlbums[index] = albumData;
-                        
-                        // Отправляем обновленные данные на сервер
-                        await fetch(`${CONFIG.WORKER_URL}/api/save-albums`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({ albums: allAlbums })
-                        });
-                    }
-                }
-            } catch (error) {
-                console.error('Ошибка сохранения альбома:', error);
+    try {
+        // Загружаем все альбомы
+        const response = await fetch(`${CONFIG.WORKER_URL}/api/get-albums`);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            let allAlbums = data.albums || [];
+            
+            // Находим и обновляем нужный альбом
+            const index = allAlbums.findIndex(album => parseInt(album.id) === albumId);
+            if (index !== -1) {
+                allAlbums[index] = albumData;
+            } else {
+                allAlbums.push(albumData);
             }
+            
+            // Отправляем обновленные данные на сервер
+            await fetch(`${CONFIG.WORKER_URL}/api/save-albums`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ albums: allAlbums })
+            });
+            
+            console.log('Альбом сохранен');
         }
+    } catch (error) {
+        console.error('Ошибка сохранения альбома:', error);
+        throw error; // Пробрасываем ошибку дальше для обработки
+    }
+}
         
         // Вспомогательные функции
         function showLoader() {
